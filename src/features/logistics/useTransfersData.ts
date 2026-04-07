@@ -62,17 +62,30 @@ export const useTransfersData = () => {
   });
 
   const addTransferMutation = useMutation({
-    mutationFn: async (transfer: Omit<Transfer, 'id'>) => {
-      const payload: Transfer = sanitizePayload({ ...transfer, id: crypto.randomUUID() } as Transfer);
-      try {
-        const { error } = await supabase.from('transfers').insert([payload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding transfer locally.");
-      }
+    onMutate: async (transfer: Omit<Transfer, 'id'>) => {
+      const payload: Transfer = sanitizePayload({ ...transfer, id: crypto.randomUUID(), isDeleted: false } as Transfer);
       await transfersCollection.insert(payload);
+      return { payload };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transfers'] })
+    mutationFn: async (transfer: Omit<Transfer, 'id'>, variables, context) => {
+      const payload = (context as { payload: Transfer })?.payload || { ...transfer, id: crypto.randomUUID(), isDeleted: false };
+      const supabasePayload = {
+        id: payload.id,
+        animal_id: payload.animalId,
+        animal_name: payload.animalName,
+        transfer_type: payload.transferType,
+        date: payload.date,
+        institution: payload.institution,
+        transport_method: payload.transportMethod,
+        cites_article_10_ref: payload.citesArticle10Ref,
+        status: payload.status,
+        is_deleted: payload.isDeleted
+      };
+
+      const { error } = await supabase.from('transfers').insert([supabasePayload]);
+      if (error) throw error; 
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['transfers'] })
   });
 
   const updateTransferMutation = useMutation({

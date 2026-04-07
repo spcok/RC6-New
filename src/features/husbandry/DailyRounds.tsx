@@ -279,7 +279,7 @@ const DailyRounds: React.FC<DailyRoundsProps> = () => {
                                 {independentAnimals.map(animal => renderAnimalRow(animal, false))}
                                 {parentMobs.map(mob => {
                                     const isExpanded = expandedMobs.has(mob.id);
-                                    const children = linkedChildren.filter(c => c.parent_mob_id === mob.id);
+                                    const children = linkedChildren.filter(c => c.parentMobId === mob.id);
 
                                     return (
                                         <React.Fragment key={mob.id}>

@@ -2,10 +2,11 @@ import { createCollection as baseCreateCollection } from '@tanstack/react-db';
 import { queryClient } from './queryClient';
 import { supabase } from './supabase';
 import { LogEntry, Animal, Timesheet } from '../types';
+import { mapToCamelCase } from './dataMapping';
 
 export interface TanStackCollection<T> {
   insert: (item: T) => Promise<void>;
-  update: (draft: T) => Promise<void>;
+  update: (draft: Partial<T> & { id: string }) => Promise<void>;
   delete: (id: string) => Promise<void>;
   getAll: () => Promise<T[]>;
 }
@@ -17,28 +18,20 @@ export const createStandardCollection = <T extends { id: string }>(tableName: st
     queryClient,
     getKey: (item: T) => item.id,
     queryFn: async () => {
-      const { data, error } = await supabase.from(tableName).select('*').eq('is_deleted', false);
+      const { data, error } = await supabase.from(tableName).select('*').eq('is_deleted', false).limit(5000);
       if (error) throw error;
-      return (data as T[]) || [];
+      return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item)) || [];
     },
-    onInsert: async (item: T) => {
-      const { error } = await supabase.from(tableName).upsert([item as Record<string, unknown>]);
-      if (error) throw new Error(`DB_SCHEMA_ERROR: ${error.message}`);
-    },
-    onUpdate: async (id: string, draft: Partial<T>) => {
-      const { error } = await supabase.from(tableName).update(draft as Record<string, unknown>).eq('id', id);
-      if (error) throw new Error(`DB_SCHEMA_ERROR: ${error.message}`);
-    },
-    sync: { enabled: true }
+    sync: { enabled: false }
   });
 
-  const update = async (draft: T) => {
-    await collection.update(draft.id, draft);
+  const singleDraftUpdate = async (draft: Partial<T> & { id: string }) => {
+    await collection.update(draft);
   };
 
   return {
     insert: collection.insert,
-    update: update,
+    update: singleDraftUpdate,
     delete: collection.delete,
     getAll: collection.queryFn
   };
@@ -47,36 +40,31 @@ export const createStandardCollection = <T extends { id: string }>(tableName: st
 // 1. Animals Collection
 export const animalsCollection = createStandardCollection<Animal>('animals');
 
-// 2. Daily Logs Collection (14-Day Offline Failover Compliant)
+// 2. Daily Logs Collection
 export const dailyLogsCollection = (() => {
   const collection = baseCreateCollection<LogEntry, string>({
     queryKey: ['daily_logs'],
     queryClient,
     getKey: (item: LogEntry) => item.id!,
     queryFn: async () => {
-      const fourteenDaysAgo = new Date();
-      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
       const { data, error } = await supabase
         .from('daily_logs')
         .select('*')
-        .gte('log_date', fourteenDaysAgo.toISOString().split('T')[0])
-        .eq('is_deleted', false);
+        .eq('is_deleted', false)
+        .limit(5000); 
       if (error) throw error;
-      return (data as LogEntry[]) || [];
+      return (data as Record<string, unknown>[]).map(item => mapToCamelCase<LogEntry>(item)) || [];
     },
-    onInsert: async (item: LogEntry) => {
-      const { error } = await supabase.from('daily_logs').upsert([item as Record<string, unknown>]);
-      if (error) throw new Error(`DB_SCHEMA_ERROR: ${error.message}`);
-    },
-    onUpdate: async (id: string, draft: Partial<LogEntry>) => {
-      const { error } = await supabase.from('daily_logs').update(draft as Record<string, unknown>).eq('id', id);
-      if (error) throw new Error(`DB_SCHEMA_ERROR: ${error.message}`);
-    },
-    sync: { enabled: true }
+    sync: { enabled: false }
   });
+
+  const singleDraftUpdate = async (draft: Partial<LogEntry> & { id: string }) => {
+    await collection.update(draft);
+  };
+
   return {
     insert: collection.insert,
-    update: async (draft: LogEntry) => await collection.update(draft.id, draft),
+    update: singleDraftUpdate,
     delete: collection.delete,
     getAll: collection.queryFn
   };

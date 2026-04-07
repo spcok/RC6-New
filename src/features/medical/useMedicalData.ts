@@ -88,44 +88,55 @@ export const useMedicalData = (animalId?: string) => {
   const quarantineRecords = useMemo(() => rawQuarantineRecords.filter(q => !q.isDeleted && (!animalId || q.animalId === animalId)), [rawQuarantineRecords, animalId]);
 
   const addClinicalNoteMutation = useMutation({
-    mutationFn: async (note: Partial<ClinicalNote>) => {
-      const supabasePayload = {
+    onMutate: async (note: Partial<ClinicalNote>) => {
+      const newNote = {
         id: note.id || crypto.randomUUID(),
-        animal_id: note.animalId,
-        animal_name: note.animalName,
-        log_date: note.date,
-        note_type: note.noteType,
-        note_text: note.noteText,
-        recheck_date: note.recheckDate,
-        staff_initials: note.staffInitials,
-        attachment_url: note.attachmentUrl,
-        thumbnail_url: note.thumbnailUrl,
-        diagnosis: note.diagnosis,
-        bcs: note.bcs,
-        weight_grams: note.weightGrams,
-        weight: note.weight,
-        weight_unit: note.weightUnit,
-        treatment_plan: note.treatmentPlan,
-        integrity_seal: note.integritySeal,
+        ...note,
+        isDeleted: false
+      } as ClinicalNote;
+      await medicalLogsCollection.insert(newNote);
+      return { newNote };
+    },
+    mutationFn: async (note: Partial<ClinicalNote>, variables, context) => {
+      const newNote = (context as { newNote: ClinicalNote })?.newNote || { id: note.id || crypto.randomUUID(), ...note };
+      const supabasePayload = {
+        id: newNote.id,
+        animal_id: newNote.animalId,
+        animal_name: newNote.animalName,
+        log_date: newNote.date,
+        note_type: newNote.noteType,
+        note_text: newNote.noteText,
+        recheck_date: newNote.recheckDate,
+        staff_initials: newNote.staffInitials,
+        attachment_url: newNote.attachmentUrl,
+        thumbnail_url: newNote.thumbnailUrl,
+        diagnosis: newNote.diagnosis,
+        bcs: newNote.bcs,
+        weight_grams: newNote.weightGrams,
+        weight: newNote.weight,
+        weight_unit: newNote.weightUnit,
+        treatment_plan: newNote.treatmentPlan,
+        integrity_seal: newNote.integritySeal,
         created_at: new Date().toISOString(),
         is_deleted: false
       };
-
-      try {
-        const { error } = await supabase.from('medical_logs').insert([supabasePayload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding clinical note locally.");
-      }
-      await medicalLogsCollection.insert(note as ClinicalNote);
+      
+      const { error } = await supabase.from('medical_logs').insert([supabasePayload]);
+      if (error) throw error; // REQUIRED: Let TanStack catch this!
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['medical_records'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['medical_records'] })
   });
 
   const updateClinicalNoteMutation = useMutation({
+    onMutate: async (note: Partial<ClinicalNote>) => {
+      if (!note.id) return;
+      const existingNote = clinicalNotes.find(n => n.id === note.id);
+      if (existingNote) {
+        await medicalLogsCollection.update(note.id, (prev) => ({ ...prev, ...note }) as ClinicalNote);
+      }
+    },
     mutationFn: async (note: Partial<ClinicalNote>) => {
       if (!note.id) throw new Error("Cannot update without an ID");
-      
       const supabasePayload = {
         animal_id: note.animalId,
         animal_name: note.animalName,
@@ -145,77 +156,87 @@ export const useMedicalData = (animalId?: string) => {
         integrity_seal: note.integritySeal,
         updated_at: new Date().toISOString()
       };
-
-      try {
-        const { error } = await supabase.from('medical_logs').update(supabasePayload).eq('id', note.id);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Updating clinical note locally.");
-      }
-      const existingNote = clinicalNotes.find(n => n.id === note.id);
-      if (!existingNote) throw new Error("Note not found");
-      await medicalLogsCollection.update({ ...existingNote, ...note } as ClinicalNote);
+      
+      const { error } = await supabase.from('medical_logs').update(supabasePayload).eq('id', note.id);
+      if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['medical_records'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['medical_records'] })
   });
 
   const addMarChartMutation = useMutation({
-    mutationFn: async (chart: Partial<MARChart>) => {
-      const supabasePayload = {
+    onMutate: async (chart: Partial<MARChart>) => {
+      const newChart = {
         id: chart.id || crypto.randomUUID(),
-        animal_id: chart.animalId,
-        animal_name: chart.animalName,
-        medication: chart.medication,
-        dosage: chart.dosage,
-        frequency: chart.frequency,
-        start_date: chart.startDate,
-        end_date: chart.endDate,
-        status: chart.status,
-        instructions: chart.instructions,
-        administered_dates: chart.administeredDates,
-        staff_initials: chart.staffInitials,
-        integrity_seal: chart.integritySeal,
+        ...chart,
+        isDeleted: false
+      } as MARChart;
+      await marChartsCollection.insert(newChart);
+      return { newChart };
+    },
+    mutationFn: async (chart: Partial<MARChart>, variables, context) => {
+      const newChart = (context as { newChart: MARChart })?.newChart || { id: chart.id || crypto.randomUUID(), ...chart };
+      const supabasePayload = {
+        id: newChart.id,
+        animal_id: newChart.animalId,
+        animal_name: newChart.animalName,
+        medication: newChart.medication,
+        dosage: newChart.dosage,
+        frequency: newChart.frequency,
+        start_date: newChart.startDate,
+        end_date: newChart.endDate,
+        status: newChart.status,
+        instructions: newChart.instructions,
+        administered_dates: newChart.administeredDates,
+        staff_initials: newChart.staffInitials,
+        integrity_seal: newChart.integritySeal,
         created_at: new Date().toISOString(),
         is_deleted: false
       };
-      try {
-        const { error } = await supabase.from('mar_charts').insert([supabasePayload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding MAR chart locally.");
-      }
-      await marChartsCollection.insert(chart as MARChart);
+      const { error } = await supabase.from('mar_charts').insert([supabasePayload]);
+      if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mar_charts'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['mar_charts'] })
   });
 
   const addQuarantineRecordMutation = useMutation({
-    mutationFn: async (record: Partial<QuarantineRecord>) => {
-      const supabasePayload = {
+    onMutate: async (record: Partial<QuarantineRecord>) => {
+      const newRecord = {
         id: record.id || crypto.randomUUID(),
-        animal_id: record.animalId,
-        animal_name: record.animalName,
-        reason: record.reason,
-        start_date: record.startDate,
-        end_date: record.endDate,
-        status: record.status,
-        isolation_notes: record.isolationNotes,
-        staff_initials: record.staffInitials,
+        ...record,
+        isDeleted: false
+      } as QuarantineRecord;
+      await quarantineRecordsCollection.insert(newRecord);
+      return { newRecord };
+    },
+    mutationFn: async (record: Partial<QuarantineRecord>, variables, context) => {
+      const newRecord = (context as { newRecord: QuarantineRecord })?.newRecord || { id: record.id || crypto.randomUUID(), ...record };
+      const supabasePayload = {
+        id: newRecord.id,
+        animal_id: newRecord.animalId,
+        animal_name: newRecord.animalName,
+        reason: newRecord.reason,
+        start_date: newRecord.startDate,
+        end_date: newRecord.endDate,
+        status: newRecord.status,
+        isolation_notes: newRecord.isolationNotes,
+        staff_initials: newRecord.staffInitials,
         created_at: new Date().toISOString(),
         is_deleted: false
       };
-      try {
-        const { error } = await supabase.from('quarantine_records').insert([supabasePayload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding quarantine record locally.");
-      }
-      await quarantineRecordsCollection.insert(record as QuarantineRecord);
+      const { error } = await supabase.from('quarantine_records').insert([supabasePayload]);
+      if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['quarantine_records'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['quarantine_records'] })
   });
 
   const updateQuarantineRecordMutation = useMutation({
+    onMutate: async (record: Partial<QuarantineRecord>) => {
+      if (!record.id) return;
+      const existingRecord = quarantineRecords.find(r => r.id === record.id);
+      if (existingRecord) {
+        await quarantineRecordsCollection.update(record.id, (prev) => ({ ...prev, ...record }) as QuarantineRecord);
+      }
+    },
     mutationFn: async (record: Partial<QuarantineRecord>) => {
       if (!record.id) throw new Error("Cannot update without an ID");
       
@@ -231,17 +252,10 @@ export const useMedicalData = (animalId?: string) => {
         updated_at: new Date().toISOString()
       };
 
-      try {
-        const { error } = await supabase.from('quarantine_records').update(supabasePayload).eq('id', record.id);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Updating quarantine record locally.");
-      }
-      const existingRecord = quarantineRecords.find(r => r.id === record.id);
-      if (!existingRecord) throw new Error("Record not found");
-      await quarantineRecordsCollection.update({ ...existingRecord, ...record } as QuarantineRecord);
+      const { error } = await supabase.from('quarantine_records').update(supabasePayload).eq('id', record.id);
+      if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['quarantine_records'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['quarantine_records'] })
   });
 
   return {

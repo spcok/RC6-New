@@ -35,7 +35,7 @@ export default function AddMovementModal({ onClose }: Props) {
       const animal = animals.find(a => a.id === data.animal_id);
       await addMovement({
         ...data,
-        animal_name: animal?.name || 'Unknown'
+        animalName: animal?.name || 'Unknown'
       });
       onClose();
     }

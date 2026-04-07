@@ -39,54 +39,51 @@ export function useTimesheetData() {
   });
 
   const clockInMutation = useMutation({
-    mutationFn: async (staff_name: string) => {
+    onMutate: async (staffName: string) => {
       const newShift: Timesheet = {
         id: crypto.randomUUID(),
-        staff_name,
+        staffName,
         date: new Date().toISOString().split('T')[0],
-        clock_in: new Date().toISOString(),
+        clockIn: new Date().toISOString(),
         status: 'Active' as const,
+        isDeleted: false,
+        updatedAt: new Date().toISOString()
+      };
+      await timesheetsCollection.insert(newShift);
+      return { newShift };
+    },
+    mutationFn: async (staffName: string, variables, context) => {
+      const newShift = (context as { newShift: Timesheet })?.newShift || { id: crypto.randomUUID(), staffName };
+      const cloudPayload = {
+        id: newShift.id,
+        staff_name: newShift.staffName,
+        date: newShift.date,
+        clock_in: newShift.clockIn,
+        status: newShift.status,
         is_deleted: false,
         created_at: new Date().toISOString()
       };
-      
-      const cloudPayload = sanitizePayload(newShift);
 
-      try {
-        const { error } = await supabase.from('timesheets').insert([cloudPayload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Clocking in locally.");
-      }
-      await timesheetsCollection.insert(newShift);
+      const { error } = await supabase.from('timesheets').insert([cloudPayload]);
+      if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['timesheets'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['timesheets'] })
   });
 
   const clockOutMutation = useMutation({
-    mutationFn: async (timesheetId: string) => {
+    onMutate: async (timesheetId: string) => {
       const existing = timesheets.find(t => t.id === timesheetId);
-      if (!existing) throw new Error("Active shift not found");
-      
-      const updatedShift: Timesheet = {
-        ...existing,
-        clock_out: new Date().toISOString(),
-        status: 'Completed' as const
-      };
-      
-      const cloudPayload = sanitizePayload(updatedShift);
-
-      try {
-        const { error } = await supabase.from('timesheets').update(cloudPayload).eq('id', timesheetId);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Clocking out locally.");
+      if (existing) {
+        const updatedShift = { ...existing, clockOut: new Date().toISOString(), status: 'Completed' as const };
+        await timesheetsCollection.update(timesheetId, () => updatedShift as Timesheet);
       }
-      
-      // Architectural Rule 3: Strict draft object mutation
-      await timesheetsCollection.update(updatedShift);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['timesheets'] })
+    mutationFn: async (timesheetId: string) => {
+      const clockOut = new Date().toISOString();
+      const { error } = await supabase.from('timesheets').update({ clock_out: clockOut, status: 'Completed' }).eq('id', timesheetId);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['timesheets'] })
   });
 
   const addTimesheetMutation = useMutation({

@@ -54,22 +54,35 @@ export const useMovementsData = () => {
   });
 
   const addMovementMutation = useMutation({
-    mutationFn: async (movement: Partial<InternalMovement>) => {
+    onMutate: async (movement: Partial<InternalMovement>) => {
       const payload: InternalMovement = {
         ...movement,
         id: movement.id || crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         isDeleted: false
       } as InternalMovement;
-      try {
-        const { error } = await supabase.from('movements').insert([payload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding movement locally.");
-      }
       await movementsCollection.insert(payload);
+      return { payload };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['movements'] })
+    mutationFn: async (movement: Partial<InternalMovement>, variables, context) => {
+      const payload = (context as { payload: InternalMovement })?.payload || { ...movement, id: crypto.randomUUID(), isDeleted: false };
+      const supabasePayload = {
+        id: payload.id,
+        animal_id: payload.animalId,
+        animal_name: payload.animalName,
+        log_date: payload.logDate,
+        movement_type: payload.movementType,
+        source_location: payload.sourceLocation,
+        destination_location: payload.destinationLocation,
+        created_by: payload.createdBy,
+        created_at: payload.createdAt,
+        is_deleted: payload.isDeleted
+      };
+
+      const { error } = await supabase.from('movements').insert([supabasePayload]);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['movements'] })
   });
 
   return { 

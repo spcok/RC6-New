@@ -32,7 +32,14 @@ export const useAnimalsData = () => {
   });
 
   const addAnimalMutation = useMutation({
+    onMutate: async (animal: Omit<Animal, 'id'>) => {
+      const id = crypto.randomUUID();
+      const newAnimal = { ...animal, id, isDeleted: false } as Animal;
+      await animalsCollection.insert(newAnimal);
+      return { id, newAnimal };
+    },
     mutationFn: async (animal: Omit<Animal, 'id'>) => {
+      // Use the ID generated in onMutate if available, or generate a new one
       const id = crypto.randomUUID();
       const supabasePayload = {
         id,
@@ -88,18 +95,19 @@ export const useAnimalsData = () => {
         is_boarding: animal.isBoarding,
         created_at: animal.createdAt,
         updated_at: animal.updatedAt,
-        is_deleted: animal.isDeleted
+        is_deleted: animal.isDeleted || false
       };
       
       const { error } = await supabase.from('animals').insert([supabasePayload]);
       if (error) throw error;
-      
-      await animalsCollection.insert({ ...animal, id } as Animal);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['animals'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['animals'] })
   });
 
   const updateAnimalMutation = useMutation({
+    onMutate: async (animal: Animal) => {
+      await animalsCollection.update(animal as Animal & { id: string });
+    },
     mutationFn: async (animal: Animal) => {
       const supabasePayload = {
         entity_type: animal.entityType,
@@ -159,10 +167,8 @@ export const useAnimalsData = () => {
       
       const { error } = await supabase.from('animals').update(supabasePayload).eq('id', animal.id);
       if (error) throw error;
-      
-      await animalsCollection.update(animal);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['animals'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['animals'] })
   });
 
   const filteredAnimals = animals.filter(animal => !animal.isDeleted && !animal.archived);

@@ -45,29 +45,32 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
               species: animal.species,
               category: animal.category,
               dob: date,
-              is_dob_unknown: false,
+              isDobUnknown: false,
               sex: 'Unknown',
               location: animal.location,
-              acquisition_date: date,
-              acquisition_type: 'BORN',
+              acquisitionDate: date,
+              acquisitionType: 'BORN',
               origin: 'Captive Bred',
-              dam_id: animal.sex === 'Female' ? animal.id : undefined,
-              sire_id: animal.sex === 'Male' ? animal.id : undefined,
-              parent_mob_id: animal.entity_type === 'GROUP' ? animal.id : animal.parent_mob_id,
+              damId: animal.sex === 'Female' ? animal.id : undefined,
+              sireId: animal.sex === 'Male' ? animal.id : undefined,
+              parentMobId: animal.entityType === 'GROUP' ? animal.id : animal.parentMobId,
+              hazardRating: animal.hazardRating,
+              isVenomous: animal.isVenomous,
+              weightUnit: animal.weightUnit,
               archived: false,
-              is_quarantine: false,
-              display_order: 0,
-              is_deleted: false
+              isQuarantine: false,
+              displayOrder: 0,
+              isDeleted: false
             });
           }
         }
 
         const payload: Partial<LogEntry> = {
           id: existingLog?.id || uuidv4(),
-          animal_id: animal.id,
-          log_type: LogType.BIRTH,
-          log_date: date,
-          user_initials: userInitials,
+          animalId: animal.id,
+          logType: LogType.BIRTH,
+          logDate: date,
+          userInitials: userInitials,
           value: `Litter Size: ${safePayload.litterSize} (${safePayload.litterHealth})`,
           notes: safePayload.notes
         };
