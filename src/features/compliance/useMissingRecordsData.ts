@@ -68,7 +68,7 @@ export function useMissingRecordsData() {
           try {
             await dailyLogsCollection.update(item);
           } catch {
-            await dailyLogsCollection.insert(item);
+            await dailyLogsCollection.insert(item as unknown as Record<string, unknown>);
           }
         }
         return mappedData;

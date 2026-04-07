@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer, VirtualItem } from '@tanstack/react-virtual';
 import { Animal } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAnimalsData } from './useAnimalsData';
@@ -70,7 +70,7 @@ const AnimalsList = () => {
           </div>
         ) : (
           <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-            {virtualizer.getVirtualItems().map((virtualRow) => {
+            {virtualizer.getVirtualItems().map((virtualRow: VirtualItem) => {
               const animal = currentAnimals[virtualRow.index];
               return (
                 <div
@@ -90,24 +90,24 @@ const AnimalsList = () => {
                   {activeTab === 'live' ? (
                     <div className="flex justify-between items-center">
                       <div>
-                        <span className="font-bold text-slate-900">{animal.name}</span>
+                        <span className="font-bold text-slate-900">{animal.name ?? 'Unknown'}</span>
                         {animal.isBoarding && <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-bold rounded-full uppercase">Boarding</span>}
-                        <span className="text-slate-500 ml-2">- {animal.species}</span>
+                        <span className="text-slate-500 ml-2">- {animal.species ?? 'Unknown'}</span>
                       </div>
                     </div>
                   ) : (
                     <div className="flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-slate-900">{animal.name}</div>
-                        <div className="text-sm text-slate-500">{animal.species || animal.category || 'Unknown Group'}</div>
+                        <div className="font-bold text-slate-900">{animal.name ?? 'Unknown'}</div>
+                        <div className="text-sm text-slate-500">{animal.species ?? animal.category ?? 'Unknown Group'}</div>
                       </div>
                       <div className="text-right text-xs text-slate-400">
                         <div className="mb-1">
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-bold uppercase text-[10px]">
-                            {animal.dispositionStatus || 'Archived'}
+                            {animal.dispositionStatus ?? 'Archived'}
                           </span>
                         </div>
-                        <div>Reason: {animal.archiveReason || 'Unknown'}</div>
+                        <div>Reason: {animal.archiveReason ?? 'Unknown'}</div>
                         <div>
                           {animal.dateOfDeath ? `Died: ${new Date(animal.dateOfDeath).toLocaleDateString()}` : 
                            animal.dispositionDate ? `Disposed: ${new Date(animal.dispositionDate).toLocaleDateString()}` :

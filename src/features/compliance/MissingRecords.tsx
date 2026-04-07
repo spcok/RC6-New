@@ -12,8 +12,8 @@ const MissingRecords: React.FC = () => {
 
   const filteredComplianceStats = useMemo(() => {
     if (selectedCategory === 'ALL') return complianceStats;
-    return complianceStats.filter(stat => {
-        const animal = alerts.find(a => a.animalId === stat.animalId);
+    return complianceStats.filter((stat: ComplianceStats) => {
+        const animal = alerts.find((a: MissingRecordAlert) => a.animalId === stat.animalId);
         return animal?.animalCategory === selectedCategory;
     });
   }, [complianceStats, alerts, selectedCategory]);
@@ -23,9 +23,9 @@ const MissingRecords: React.FC = () => {
         const categories = Object.values(categoryCompliance);
         if (categories.length === 0) return { husbandry: 0, details: 0, health: 0 };
         return {
-            husbandry: Math.round(categories.reduce((a, b) => a + b.husbandry, 0) / categories.length),
-            details: Math.round(categories.reduce((a, b) => a + b.details, 0) / categories.length),
-            health: Math.round(categories.reduce((a, b) => a + b.health, 0) / categories.length),
+            husbandry: Math.round(categories.reduce((a: number, b: { husbandry: number, details: number, health: number }) => a + b.husbandry, 0) / categories.length),
+            details: Math.round(categories.reduce((a: number, b: { husbandry: number, details: number, health: number }) => a + b.details, 0) / categories.length),
+            health: Math.round(categories.reduce((a: number, b: { husbandry: number, details: number, health: number }) => a + b.health, 0) / categories.length),
         };
     }
     return (categoryCompliance as Record<string, { husbandry: number, details: number, health: number }>)[selectedCategory] || { husbandry: 0, details: 0, health: 0 };
@@ -86,8 +86,8 @@ const MissingRecords: React.FC = () => {
             </div>
             
             <div className="divide-y divide-slate-100">
-                {filteredComplianceStats.map(stat => {
-                    const animalAlert = alerts.find(a => a.animalId === stat.animalId && a.category === activeTab);
+                {filteredComplianceStats.map((stat: ComplianceStats) => {
+                    const animalAlert = alerts.find((a: MissingRecordAlert) => a.animalId === stat.animalId && a.category === activeTab);
                     if (!animalAlert) return null;
                     
                     const score = activeTab === 'Details' ? stat.detailsScore : activeTab === 'Health' ? stat.healthScore : stat.husbandryScore;
@@ -104,7 +104,7 @@ const MissingRecords: React.FC = () => {
                                 {renderStatusDot(score)}
                                 <div className="flex flex-col">
                                     <span className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors">
-                                        {animalAlert.animalName}
+                                        {animalAlert.animalName ?? 'Unknown'}
                                     </span>
                                     <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
                                         Missing: <span className="text-slate-800">{missingContext}</span>
@@ -115,7 +115,7 @@ const MissingRecords: React.FC = () => {
                             {/* Badges & Actions */}
                             <div className="flex items-center gap-4 sm:gap-6">
                                 <span className="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
-                                    {animalAlert.daysOverdue} Days Overdue
+                                    {animalAlert.daysOverdue ?? 0} Days Overdue
                                 </span>
                                 
                                 <button className="flex items-center justify-center gap-1 text-emerald-700 font-black uppercase tracking-widest text-[10px] bg-emerald-50 border border-emerald-200 px-5 py-2.5 rounded-xl hover:bg-emerald-100 hover:text-emerald-800 transition-all shadow-sm">
@@ -126,7 +126,7 @@ const MissingRecords: React.FC = () => {
                         </div>
                     );
                 })}
-                {filteredComplianceStats.filter(stat => alerts.some(a => a.animalId === stat.animalId && a.category === activeTab)).length === 0 && (
+                {filteredComplianceStats.filter((stat: ComplianceStats) => alerts.some((a: MissingRecordAlert) => a.animalId === stat.animalId && a.category === activeTab)).length === 0 && (
                     <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
                         <div className="p-4 bg-emerald-50 text-emerald-600 rounded-full">
                             <ShieldAlert size={32} />
@@ -154,12 +154,12 @@ const MissingRecords: React.FC = () => {
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold uppercase tracking-tight text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm cursor-pointer"
         >
-            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            {categories.map((cat: string) => <option key={cat} value={cat}>{cat}</option>)}
         </select>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-        {(['Husbandry', 'Details', 'Health'] as const).map((tab) => (
+        {(['Husbandry', 'Details', 'Health'] as const).map((tab: 'Husbandry' | 'Details' | 'Health') => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}

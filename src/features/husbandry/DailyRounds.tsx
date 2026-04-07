@@ -328,11 +328,11 @@ const DailyRounds: React.FC<DailyRoundsProps> = () => {
                                     className={`flex-1 border-2 rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium focus:outline-none transition-colors disabled:opacity-50 ${isNoteRequired ? 'bg-amber-50 border-amber-300 focus:border-amber-500 placeholder-amber-400 text-amber-800' : 'bg-slate-50 border-slate-200 focus:border-slate-400'}`}
                                 />
                             </div>
-                            {currentUser?.signatureData && signingInitials && (
+                            {currentUser?.signature_data && signingInitials && (
                                 <div className="hidden md:flex landscape:hidden lg:landscape:flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 opacity-80">
                                     <PenTool size={12} className="text-slate-400"/>
                                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mr-2">Digital Sig:</span>
-                                    <img src={currentUser.signatureData} alt="Sig" className="h-6 w-auto mix-blend-multiply" />
+                                    <img src={currentUser.signature_data} alt="Sig" className="h-6 w-auto mix-blend-multiply" />
                                 </div>
                             )}
                         </div>

@@ -1,7 +1,7 @@
 import { createCollection as baseCreateCollection } from '@tanstack/react-db';
 import { queryClient } from './queryClient';
 import { supabase } from './supabase';
-import { LogEntry, Animal, Timesheet } from '../types';
+import { LogEntry, Animal, Timesheet, Task, ClinicalNote } from '../types';
 import { mapToCamelCase } from './dataMapping';
 
 export interface TanStackCollection<T> {
@@ -22,7 +22,7 @@ export const createStandardCollection = <T extends { id: string }>(tableName: st
       if (error) throw error;
       return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item)) || [];
     },
-    sync: { enabled: false },
+    sync: {},
     // ARCHITECTURAL FIX: Dummy handlers satisfy the library's local insert validation 
     // without triggering rogue network requests. TanStack Query still handles the network.
     onInsert: async () => { return; },
@@ -60,7 +60,7 @@ export const dailyLogsCollection = (() => {
       if (error) throw error;
       return (data as Record<string, unknown>[]).map(item => mapToCamelCase<LogEntry>(item)) || [];
     },
-    sync: { enabled: false },
+    sync: {},
     // ARCHITECTURAL FIX: Dummy handlers
     onInsert: async () => { return; },
     onUpdate: async () => { return; },
@@ -80,7 +80,7 @@ export const dailyLogsCollection = (() => {
 })();
 
 // 3. Tasks Collection
-export const tasksCollection = createStandardCollection<{ id: string; title: string; dueDate: string; completed: boolean; type: string; animalId: string; notes: string; }>('tasks');
+export const tasksCollection = createStandardCollection<Task>('tasks');
 
 // --- SETTINGS & USERS MODULES ---
 export const usersCollection = createStandardCollection<{ id: string; name: string; email: string; role: string; }>('users');
@@ -89,7 +89,7 @@ export const zlaDocumentsCollection = createStandardCollection<{ id: string; nam
 export const directoryCollection = createStandardCollection<{ id: string; name: string; category: string; }>('directory');
 
 // --- MEDICAL & LOGISTICS MODULES ---
-export const medicalLogsCollection = createStandardCollection<{ id: string; animalId: string; logType: string; logDate: string; value: string; }>('medical_logs');
+export const medicalLogsCollection = createStandardCollection<ClinicalNote>('medical_logs');
 export const marChartsCollection = createStandardCollection<{ id: string; animalId: string; noteType: string; }>('mar_charts');
 export const quarantineRecordsCollection = createStandardCollection<{ id: string; animalId: string; startDate: string; }>('quarantine_records');
 export const movementsCollection = createStandardCollection<{ id: string; animalId: string; from: string; to: string; }>('movements');

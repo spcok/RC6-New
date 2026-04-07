@@ -157,7 +157,7 @@ const FeedingSchedule: React.FC = () => {
       const groups = new Map<string, { animal: Animal, tasks: Task[] }>();
       
       filteredTasks.forEach(task => {
-          const aId = task.animal_id;
+          const aId = task.animalId;
           if (!aId) return;
           if (!groups.has(aId)) {
               const animal = animals.find(a => a.id === aId);
@@ -401,11 +401,11 @@ const FeedingSchedule: React.FC = () => {
                             viewLayout === 'timeline' ? (
                                 <div className="space-y-2">
                                     {filteredTasks.map(task => {
-                                        const animal = animals.find(a => a.id === (task.animal_id));
+                                        const animal = animals.find(a => a.id === (task.animalId));
                                         if (!animal) return null;
                                         
-                                        const dateObj = new Date(task.due_date as string);
-                                        const isToday = (task.due_date) === getUKLocalDate();
+                                        const dateObj = new Date(task.dueDate as string);
+                                        const isToday = (task.dueDate) === getUKLocalDate();
 
                                         return (
                                             <div key={task.id} className={`flex items-center bg-white border border-slate-200 rounded-lg p-2.5 hover:bg-slate-50 transition-colors group ${task.completed ? 'opacity-60' : ''}`}>
@@ -459,9 +459,9 @@ const FeedingSchedule: React.FC = () => {
                                                 <div className="bg-slate-50 p-2 rounded-md border border-slate-100 flex items-center justify-between">
                                                     <span className="text-[10px] font-medium text-slate-500">Range</span>
                                                     <div className="text-[11px] font-medium text-slate-700 flex items-center gap-1">
-                                                        {new Date(tasks[0].due_date as string).toLocaleDateString()} 
+                                                        {new Date(tasks[0].dueDate as string).toLocaleDateString()} 
                                                         <ArrowRight size={10} className="text-slate-400"/> 
-                                                        {new Date(tasks[tasks.length - 1].due_date as string).toLocaleDateString()}
+                                                        {new Date(tasks[tasks.length - 1].dueDate as string).toLocaleDateString()}
                                                     </div>
                                                 </div>
                                                 <div className="bg-slate-50 p-2 rounded-md border border-slate-100">

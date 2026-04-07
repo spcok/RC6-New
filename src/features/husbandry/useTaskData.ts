@@ -35,9 +35,9 @@ export const useTaskData = () => {
         
         for (const item of mappedData) {
           try {
-            await tasksCollection.update(sanitizePayload(item));
+            await tasksCollection.update(sanitizePayload(item) as Partial<Task> & { id: string; });
           } catch {
-            await tasksCollection.insert(sanitizePayload(item));
+            await tasksCollection.insert(sanitizePayload(item) as Task);
           }
         }
         

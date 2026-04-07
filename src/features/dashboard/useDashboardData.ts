@@ -10,19 +10,19 @@ export interface EnhancedAnimal extends Animal {
   todayFeed?: LogEntry;
   lastFedStr: string;
   displayId: string;
-  nextFeedTask?: { due_date: string; notes?: string };
+  nextFeedTask?: { dueDate: string; notes?: string };
 }
 
 export interface AnimalStatsData {
-  todayWeight?: { weight?: number; weight_unit?: string; weight_grams?: number; value?: string | number; log_date?: string | Date };
-  previousWeight?: { weight?: number; weight_unit?: string; weight_grams?: number; value?: string | number; log_date?: string | Date };
-  todayFeed?: { value?: string | number; log_date?: string | Date };
+  todayWeight?: { weight?: number; weightUnit?: string; weightGrams?: number; value?: string | number; logDate?: string | Date };
+  previousWeight?: { weight?: number; weightUnit?: string; weightGrams?: number; value?: string | number; logDate?: string | Date };
+  todayFeed?: { value?: string | number; logDate?: string | Date };
 }
 
 export interface PendingTask {
   id: string;
   title: string;
-  due_date?: string;
+  dueDate?: string;
 }
 
 export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDate: string) {
