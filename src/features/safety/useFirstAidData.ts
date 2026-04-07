@@ -43,7 +43,17 @@ export function useFirstAidData() {
     },
     mutationFn: async (log: Omit<FirstAidLog, 'id' | 'created_at'>) => {
       const payload = { ...log, id: crypto.randomUUID(), created_at: new Date().toISOString() };
-      const { error } = await supabase.from('first_aid').insert([payload]);
+      const supabasePayload = {
+        id: payload.id,
+        animal_id: payload.animalId,
+        log_date: payload.logDate,
+        incident_type: payload.incidentType,
+        treatment_given: payload.treatmentGiven,
+        staff_initials: payload.staffInitials,
+        created_at: payload.created_at,
+        is_deleted: payload.isDeleted ?? false
+      };
+      const { error } = await supabase.from('first_aid').insert([supabasePayload]);
       if (error) throw error;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['firstAid'] })

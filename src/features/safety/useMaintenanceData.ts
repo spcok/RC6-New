@@ -41,7 +41,15 @@ export const useMaintenanceData = () => {
       return { task };
     },
     mutationFn: async (task: MaintenanceLog) => {
-      const { error } = await supabase.from('maintenance').update(task).eq('id', task.id);
+      const supabasePayload = {
+        animal_id: task.animalId,
+        log_date: task.logDate,
+        log_type: task.logType,
+        log_details: task.logDetails,
+        staff_initials: task.staffInitials,
+        is_deleted: task.isDeleted
+      };
+      const { error } = await supabase.from('maintenance').update(supabasePayload).eq('id', task.id);
       if (error) throw error;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['maintenance'] })

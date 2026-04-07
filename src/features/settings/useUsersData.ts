@@ -24,7 +24,18 @@ export function useUsersData() {
       return { id, updates };
     },
     mutationFn: async ({ id, updates }: { id: string, updates: Partial<User> }) => {
-      const { error } = await supabase.from('users').update(updates).eq('id', id);
+      const supabasePayload: Record<string, unknown> = {};
+      if (updates.email !== undefined) supabasePayload.email = updates.email;
+      if (updates.name !== undefined) supabasePayload.name = updates.name;
+      if (updates.role !== undefined) supabasePayload.role = updates.role;
+      if (updates.initials !== undefined) supabasePayload.initials = updates.initials;
+      if (updates.pin !== undefined) supabasePayload.pin = updates.pin;
+      if (updates.jobPosition !== undefined) supabasePayload.job_position = updates.jobPosition;
+      if (updates.permissions !== undefined) supabasePayload.permissions = updates.permissions;
+      if (updates.signatureData !== undefined) supabasePayload.signature_data = updates.signatureData;
+      if (updates.integritySeal !== undefined) supabasePayload.integrity_seal = updates.integritySeal;
+
+      const { error } = await supabase.from('users').update(supabasePayload).eq('id', id);
       if (error) throw error;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
