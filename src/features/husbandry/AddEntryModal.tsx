@@ -24,6 +24,7 @@ interface AddEntryModalProps {
 
 export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialType, existingLog, initialDate, defaultTemperature }: AddEntryModalProps) {
   const { currentUser } = useAuthStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Operational Lists for child forms
   const safeCategory = animal?.category || AnimalCategory.MAMMALS;
@@ -35,6 +36,16 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
   const [userInitials, setUserInitials] = useState(existingLog?.userInitials || currentUser?.initials || '');
 
   if (!isOpen || !animal) return null;
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await onSave({ logType, logDate: date, userInitials });
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Delegate to specific TanStack forms
   const renderSpecificForm = () => {
@@ -110,6 +121,18 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
 
           {/* Dynamic Form Injection */}
           {renderSpecificForm()}
+        </div>
+        
+        {/* Footer */}
+        <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !animal.id}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Saving...' : 'Save Entry'}
+          </button>
         </div>
       </div>
     </div>
