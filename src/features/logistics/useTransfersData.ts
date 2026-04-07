@@ -46,13 +46,15 @@ export const useTransfersData = () => {
           isDeleted: item.is_deleted
         }));
         
-        for (const item of transfers) {
-          try {
-            await transfersCollection.update(sanitizePayload(item));
-          } catch {
-            await transfersCollection.insert(sanitizePayload(item));
+        setTimeout(async () => {
+          for (const item of transfers) {
+            try {
+              await transfersCollection.update(sanitizePayload(item));
+            } catch {
+              await transfersCollection.insert(sanitizePayload(item));
+            }
           }
-        }
+        }, 0);
         return transfers;
       } catch {
         console.warn("Network unreachable. Serving transfers from local vault.");
@@ -63,9 +65,14 @@ export const useTransfersData = () => {
 
   const addTransferMutation = useMutation({
     onMutate: async (transfer: Omit<Transfer, 'id'>) => {
+      await queryClient.cancelQueries({ queryKey: ['transfers'] });
+      const previousTransfers = queryClient.getQueryData<Transfer[]>(['transfers']);
       const payload: Transfer = sanitizePayload({ ...transfer, id: crypto.randomUUID(), isDeleted: false } as Transfer);
+      
+      queryClient.setQueryData(['transfers'], [...(previousTransfers || []), payload]);
       await transfersCollection.insert(payload);
-      return { payload };
+      
+      return { previousTransfers };
     },
     mutationFn: async (transfer: Omit<Transfer, 'id'>) => {
       const payload = { ...transfer, id: crypto.randomUUID(), isDeleted: false };
@@ -85,10 +92,24 @@ export const useTransfersData = () => {
       const { error } = await supabase.from('transfers').insert([supabasePayload]);
       if (error) throw error; 
     },
+    onError: (_err, _newTransfer, context) => {
+      queryClient.setQueryData(['transfers'], context?.previousTransfers);
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['transfers'] })
   });
 
   const updateTransferMutation = useMutation({
+    onMutate: async (transfer: Transfer) => {
+      await queryClient.cancelQueries({ queryKey: ['transfers'] });
+      const previousTransfers = queryClient.getQueryData<Transfer[]>(['transfers']);
+      
+      queryClient.setQueryData(['transfers'], (old: Transfer[] = []) => 
+        old.map(t => t.id === transfer.id ? { ...t, ...transfer } : t)
+      );
+      await transfersCollection.update(sanitizePayload(transfer));
+      
+      return { previousTransfers };
+    },
     mutationFn: async (transfer: Transfer) => {
       const supabasePayload = {
         animal_id: transfer.animalId,
@@ -101,31 +122,39 @@ export const useTransfersData = () => {
         status: transfer.status,
         is_deleted: transfer.isDeleted
       };
-      try {
-        const { error } = await supabase.from('transfers').update(supabasePayload).eq('id', transfer.id);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Updating transfer locally.");
-      }
+      const { error } = await supabase.from('transfers').update(supabasePayload).eq('id', transfer.id);
+      if (error) throw error;
       await transfersCollection.update(sanitizePayload(transfer));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transfers'] })
+    onError: (_err, _transfer, context) => {
+      queryClient.setQueryData(['transfers'], context?.previousTransfers);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['transfers'] })
   });
 
   const deleteTransferMutation = useMutation({
-    mutationFn: async (id: string) => {
-      try {
-        const { error } = await supabase.from('transfers').update({ is_deleted: true }).eq('id', id);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Deleting transfer locally.");
-      }
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ['transfers'] });
+      const previousTransfers = queryClient.getQueryData<Transfer[]>(['transfers']);
+      
+      queryClient.setQueryData(['transfers'], (old: Transfer[] = []) => 
+        old.map(t => t.id === id ? { ...t, isDeleted: true } : t)
+      );
       const existing = transfers.find(t => t.id === id);
       if (existing) {
         await transfersCollection.update(sanitizePayload({ ...existing, isDeleted: true }));
       }
+      
+      return { previousTransfers };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transfers'] })
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('transfers').update({ is_deleted: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onError: (_err, _id, context) => {
+      queryClient.setQueryData(['transfers'], context?.previousTransfers);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['transfers'] })
   });
 
   return {

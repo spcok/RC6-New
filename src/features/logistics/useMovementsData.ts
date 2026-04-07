@@ -3,6 +3,19 @@ import { movementsCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { InternalMovement, MovementType } from '../../types';
 
+interface SupabaseMovement {
+  id: string;
+  animal_id: string | null;
+  animal_name: string | null;
+  log_date: string | null;
+  movement_type: string | null;
+  source_location: string | null;
+  destination_location: string | null;
+  created_by: string | null;
+  created_at: string;
+  is_deleted: boolean;
+}
+
 export const useMovementsData = () => {
   const queryClient = useQueryClient();
 
@@ -12,30 +25,28 @@ export const useMovementsData = () => {
       try {
         const { data, error } = await supabase.from('movements').select('*');
         if (error) throw error;
-        
-        const camelCaseData = mapToCamelCase<InternalMovement>(data as Record<string, unknown>[]) as InternalMovement[];
-
-        const movements: InternalMovement[] = camelCaseData.map((item: InternalMovement): InternalMovement => ({
-          ...item,
-          id: item.id ?? crypto.randomUUID(),
-          animalId: item.animalId ?? "",
-          animalName: item.animalName ?? "Unknown",
-          logDate: item.logDate ?? new Date().toISOString(),
-          movementType: item.movementType ?? MovementType.TRANSFER,
-          sourceLocation: item.sourceLocation ?? "",
-          destinationLocation: item.destinationLocation ?? "",
-          createdBy: item.createdBy ?? "Unknown",
-          createdAt: item.createdAt ?? new Date().toISOString(),
-          isDeleted: item.isDeleted ?? false
+        const movements: InternalMovement[] = (data as unknown as SupabaseMovement[]).map((item: SupabaseMovement) => ({
+          id: item.id,
+          animalId: item.animal_id || '',
+          animalName: item.animal_name || 'Unknown',
+          logDate: item.log_date || new Date().toISOString(),
+          movementType: (item.movement_type as MovementType) || MovementType.TRANSFER,
+          sourceLocation: item.source_location || '',
+          destinationLocation: item.destination_location || '',
+          createdBy: item.created_by || 'Unknown',
+          createdAt: item.created_at || '',
+          isDeleted: item.is_deleted || false
         }));
         
-        for (const item of movements) {
-          try {
-            await movementsCollection.update(item);
-          } catch {
-            await movementsCollection.insert(item);
+        setTimeout(async () => {
+          for (const item of movements) {
+            try {
+              await movementsCollection.update(item);
+            } catch {
+              await movementsCollection.insert(item);
+            }
           }
-        }
+        }, 0);
         return movements;
       } catch {
         console.warn("Network unreachable. Serving movements from local vault.");
@@ -46,14 +57,19 @@ export const useMovementsData = () => {
 
   const addMovementMutation = useMutation({
     onMutate: async (movement: Partial<InternalMovement>) => {
+      await queryClient.cancelQueries({ queryKey: ['movements'] });
+      const previousMovements = queryClient.getQueryData<InternalMovement[]>(['movements']);
       const payload: InternalMovement = {
         ...movement,
         id: movement.id || crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         isDeleted: false
       } as InternalMovement;
+      
+      queryClient.setQueryData(['movements'], [...(previousMovements || []), payload]);
       await movementsCollection.insert(payload);
-      return { payload };
+      
+      return { previousMovements };
     },
     mutationFn: async (movement: Partial<InternalMovement>) => {
       const payload = {
@@ -78,6 +94,9 @@ export const useMovementsData = () => {
 
       const { error } = await supabase.from('movements').insert([supabasePayload]);
       if (error) throw error;
+    },
+    onError: (_err, _newMovement, context) => {
+      queryClient.setQueryData(['movements'], context?.previousMovements);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['movements'] })
   });
