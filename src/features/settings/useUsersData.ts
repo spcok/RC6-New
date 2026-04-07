@@ -1,102 +1,62 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLiveQuery } from '@tanstack/react-db';
-import { User, RolePermissionConfig } from '../../types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
+import { mapToCamelCase } from '../../lib/dataMapping';
+import { UserProfile } from '../../types';
 
-export function useUsersData() {
+export const useUsersData = () => {
   const queryClient = useQueryClient();
 
-  const { data: users = [], isLoading: isLoadingUsers } = useLiveQuery((q) => q.from({ users: usersCollection }));
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('users').select('*').eq('is_deleted', false);
+        if (error) throw error;
 
-  // Note: Role permissions are not yet in a collection, keeping as is for now or refactoring if needed.
-  // Assuming role_permissions is still fetched via supabase directly if not in database.ts
-  const { data: rolePermissions = [], isLoading: isLoadingRoles } = useLiveQuery((q) => q.from({ role_permissions: usersCollection })); // Placeholder
+        if (!data) return [];
 
-  const isLoading = isLoadingUsers || isLoadingRoles;
+        const camelCaseData = mapToCamelCase<UserProfile[]>(data);
+
+        // Optimistically sync to the local vault
+        for (const item of camelCaseData) {
+          try {
+            await usersCollection.update(item);
+          } catch {
+            await usersCollection.insert(item);
+          }
+        }
+        return camelCaseData;
+      } catch (err) {
+        console.warn("Network unreachable. Serving users from local vault.");
+        const localData = await usersCollection.getAll();
+        return localData as unknown as UserProfile[];
+      }
+    }
+  });
 
   const updateUserMutation = useMutation({
-    onMutate: async ({ id, updates }: { id: string, updates: Partial<User> }) => {
-      const existing = users.find(u => u.id === id);
-      if (existing) {
-        await usersCollection.update({ ...existing, ...updates } as User & { id: string });
-      }
-      return { id, updates };
+    onMutate: async (user: UserProfile) => {
+      await usersCollection.update(user);
     },
-    mutationFn: async ({ id, updates }: { id: string, updates: Partial<User> }) => {
-      const supabasePayload: Record<string, unknown> = {};
-      if (updates.email !== undefined) supabasePayload.email = updates.email;
-      if (updates.name !== undefined) supabasePayload.name = updates.name;
-      if (updates.role !== undefined) supabasePayload.role = updates.role;
-      if (updates.initials !== undefined) supabasePayload.initials = updates.initials;
-      if (updates.pin !== undefined) supabasePayload.pin = updates.pin;
-      if (updates.jobPosition !== undefined) supabasePayload.job_position = updates.jobPosition;
-      if (updates.permissions !== undefined) supabasePayload.permissions = updates.permissions;
-      if (updates.signatureData !== undefined) supabasePayload.signature_data = updates.signatureData;
-      if (updates.integritySeal !== undefined) supabasePayload.integrity_seal = updates.integritySeal;
-
-      const { error } = await supabase.from('users').update(supabasePayload).eq('id', id);
+    mutationFn: async (user: UserProfile) => {
+      // Map back to snake_case for Supabase
+      const supabasePayload = {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        is_deleted: user.isDeleted ?? false
+      };
+      
+      const { error } = await supabase.from('users').update(supabasePayload).eq('id', user.id);
       if (error) throw error;
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-  });
-
-  const deleteUserMutation = useMutation({
-    onMutate: async (id: string) => {
-      const existing = users.find(u => u.id === id);
-      if (existing) {
-        await usersCollection.update({ ...existing, is_deleted: true } as User & { id: string });
-      }
-      return { id };
-    },
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('users').update({ is_deleted: true }).eq('id', id);
-      if (error) throw error;
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-  });
-
-  const addUserMutation = useMutation({
-    onMutate: async (userData: { email: string; password?: string; profileData: Partial<User> }) => {
-      // We don't have the new user ID yet, so we can't insert into local vault until we get the response.
-      // This is an exception to the rule because the server generates the ID.
-      return { userData };
-    },
-    mutationFn: async (userData: { email: string; password?: string; profileData: Partial<User> }) => {
-      const { data, error } = await supabase.functions.invoke('create-staff-account', {
-        body: userData
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const newUser = data.user as User;
-      await usersCollection.insert(newUser);
-      return data;
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-  });
-
-  const updateRolePermissionsMutation = useMutation({
-    mutationFn: async ({ role, updates }: { role: string, updates: Partial<RolePermissionConfig> }) => {
-      const { error } = await supabase
-        .from('role_permissions')
-        .update(updates)
-        .eq('id', role.toLowerCase());
-      if (error) throw error;
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['role_permissions'] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] })
   });
 
   return { 
-    users: users.filter(u => !u.is_deleted), 
-    rolePermissions, 
-    isLoading, 
-    deleteUser: deleteUserMutation.mutateAsync, 
-    addUser: addUserMutation.mutateAsync,
-    updateUser: (id: string, updates: Partial<User>) => updateUserMutation.mutateAsync({ id, updates }), 
-    updateRolePermissions: (role: string, updates: Partial<RolePermissionConfig>) => updateRolePermissionsMutation.mutateAsync({ role, updates }),
-    refresh: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      queryClient.invalidateQueries({ queryKey: ['role_permissions'] });
-    }
+    users, 
+    isLoading,
+    updateUser: updateUserMutation.mutateAsync
   };
-}
+};

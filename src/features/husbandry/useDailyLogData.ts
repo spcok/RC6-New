@@ -83,26 +83,27 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
         ...entry
       } as LogEntry;
       
+      // CRITICAL FIX: Map camelCase app state to snake_case database columns
       const supabasePayload = {
         id: newEntry.id,
-        animalId: newEntry.animalId,
-        logType: newEntry.logType,
-        logDate: newEntry.logDate,
+        animal_id: newEntry.animalId,
+        log_type: newEntry.logType,
+        log_date: newEntry.logDate,
         value: newEntry.value,
         notes: newEntry.notes,
-        userInitials: newEntry.userInitials,
-        weightGrams: newEntry.weightGrams,
+        user_initials: newEntry.userInitials,
+        weight_grams: newEntry.weightGrams,
         weight: newEntry.weight,
-        weightUnit: newEntry.weightUnit,
-        healthRecordType: newEntry.healthRecordType,
-        baskingTempC: newEntry.baskingTempC,
-        coolTempC: newEntry.coolTempC,
-        temperatureC: newEntry.temperatureC,
-        createdAt: newEntry.createdAt || new Date().toISOString(),
-        createdBy: newEntry.createdBy,
-        integritySeal: newEntry.integritySeal,
-        updatedAt: newEntry.updatedAt,
-        isDeleted: newEntry.isDeleted
+        weight_unit: newEntry.weightUnit,
+        health_record_type: newEntry.healthRecordType,
+        basking_temp_c: newEntry.baskingTempC,
+        cool_temp_c: newEntry.coolTempC,
+        temperature_c: newEntry.temperatureC,
+        created_at: newEntry.createdAt || new Date().toISOString(),
+        created_by: newEntry.createdBy,
+        integrity_seal: newEntry.integritySeal,
+        updated_at: newEntry.updatedAt,
+        is_deleted: newEntry.isDeleted
       };
 
       const { error } = await supabase.from('daily_logs').insert([supabasePayload]);
@@ -123,25 +124,26 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
     mutationFn: async (entry: Partial<LogEntry>) => {
       if (!entry.id) throw new Error("Cannot update without an ID");
 
+      // CRITICAL FIX: Map camelCase app state to snake_case database columns
       const supabasePayload = {
-        animalId: entry.animalId,
-        logType: entry.logType,
-        logDate: entry.logDate,
+        animal_id: entry.animalId,
+        log_type: entry.logType,
+        log_date: entry.logDate,
         value: entry.value,
         notes: entry.notes,
-        userInitials: entry.userInitials,
-        weightGrams: entry.weightGrams,
+        user_initials: entry.userInitials,
+        weight_grams: entry.weightGrams,
         weight: entry.weight,
-        weightUnit: entry.weightUnit,
-        healthRecordType: entry.healthRecordType,
-        baskingTempC: entry.baskingTempC,
-        coolTempC: entry.coolTempC,
-        temperatureC: entry.temperatureC,
-        createdAt: entry.createdAt,
-        createdBy: entry.createdBy,
-        integritySeal: entry.integritySeal,
-        updatedAt: new Date().toISOString(),
-        isDeleted: entry.isDeleted
+        weight_unit: entry.weightUnit,
+        health_record_type: entry.healthRecordType,
+        basking_temp_c: entry.baskingTempC,
+        cool_temp_c: entry.coolTempC,
+        temperature_c: entry.temperatureC,
+        created_at: entry.createdAt,
+        created_by: entry.createdBy,
+        integrity_seal: entry.integritySeal,
+        updated_at: new Date().toISOString(),
+        is_deleted: entry.isDeleted
       };
 
       const { error } = await supabase.from('daily_logs').update(supabasePayload).eq('id', entry.id);
@@ -159,7 +161,7 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
       return { id };
     },
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('daily_logs').update({ isDeleted: true }).eq('id', id);
+      const { error } = await supabase.from('daily_logs').update({ is_deleted: true }).eq('id', id);
       if (error) throw error;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['dailyLogs'] })
