@@ -18,15 +18,27 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
       try {
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
-        
-        const mappedData: LogEntry[] = data.map((item: Record<string, unknown>) => mapToCamelCase<LogEntry>(item));
+
+        if (!data) return [];
+
+        const camelCaseData = mapToCamelCase<LogEntry>(data as Record<string, unknown>[]) as LogEntry[];
+
+        const mappedData: LogEntry[] = camelCaseData.map((item: LogEntry): LogEntry => ({
+          ...item,
+          id: (item.id as string) ?? crypto.randomUUID(),
+          animalId: item.animalId ?? "",
+          logType: item.logType ?? LogType.GENERAL,
+          logDate: item.logDate ?? new Date().toISOString(),
+          value: item.value ?? "",
+          isDeleted: item.isDeleted ?? false,
+        }));
         
         // Refresh local vault
         for (const item of mappedData) {
           try {
-            await dailyLogsCollection.update(item as LogEntry);
+            await dailyLogsCollection.update(item);
           } catch {
-            await dailyLogsCollection.insert(item as LogEntry);
+            await dailyLogsCollection.insert(item);
           }
         }
         
@@ -64,31 +76,35 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
       return { newEntry };
     },
     mutationFn: async (entry: Partial<LogEntry>) => {
-      const newEntry = { id: entry.id || crypto.randomUUID(), ...entry, isDeleted: false };
+      const newEntry: LogEntry = {
+        id: entry.id || crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        isDeleted: false,
+        ...entry
+      } as LogEntry;
       
       const supabasePayload = {
         id: newEntry.id,
-        animal_id: newEntry.animalId,
-        log_type: newEntry.logType,
-        log_date: newEntry.logDate,
+        animalId: newEntry.animalId,
+        logType: newEntry.logType,
+        logDate: newEntry.logDate,
         value: newEntry.value,
         notes: newEntry.notes,
-        user_initials: newEntry.userInitials,
-        weight_grams: newEntry.weightGrams,
+        userInitials: newEntry.userInitials,
+        weightGrams: newEntry.weightGrams,
         weight: newEntry.weight,
-        weight_unit: newEntry.weightUnit,
-        health_record_type: newEntry.healthRecordType,
-        basking_temp_c: newEntry.baskingTempC,
-        cool_temp_c: newEntry.coolTempC,
-        temperature_c: newEntry.temperatureC,
-        created_at: newEntry.createdAt || new Date().toISOString(),
-        created_by: newEntry.createdBy,
-        integrity_seal: newEntry.integritySeal,
-        updated_at: newEntry.updatedAt,
-        is_deleted: newEntry.isDeleted
+        weightUnit: newEntry.weightUnit,
+        healthRecordType: newEntry.healthRecordType,
+        baskingTempC: newEntry.baskingTempC,
+        coolTempC: newEntry.coolTempC,
+        temperatureC: newEntry.temperatureC,
+        createdAt: newEntry.createdAt || new Date().toISOString(),
+        createdBy: newEntry.createdBy,
+        integritySeal: newEntry.integritySeal,
+        updatedAt: newEntry.updatedAt,
+        isDeleted: newEntry.isDeleted
       };
 
-      // ARCHITECTURAL FIX: Let the error throw so TanStack Query queues it
       const { error } = await supabase.from('daily_logs').insert([supabasePayload]);
       if (error) throw error; 
     },
@@ -102,29 +118,30 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
       if (existing) {
         await dailyLogsCollection.update({ ...existing, ...entry } as LogEntry & { id: string });
       }
+      return { entry };
     },
     mutationFn: async (entry: Partial<LogEntry>) => {
       if (!entry.id) throw new Error("Cannot update without an ID");
 
       const supabasePayload = {
-        animal_id: entry.animalId,
-        log_type: entry.logType,
-        log_date: entry.logDate,
+        animalId: entry.animalId,
+        logType: entry.logType,
+        logDate: entry.logDate,
         value: entry.value,
         notes: entry.notes,
-        user_initials: entry.userInitials,
-        weight_grams: entry.weightGrams,
+        userInitials: entry.userInitials,
+        weightGrams: entry.weightGrams,
         weight: entry.weight,
-        weight_unit: entry.weightUnit,
-        health_record_type: entry.healthRecordType,
-        basking_temp_c: entry.baskingTempC,
-        cool_temp_c: entry.coolTempC,
-        temperature_c: entry.temperatureC,
-        created_at: entry.createdAt,
-        created_by: entry.createdBy,
-        integrity_seal: entry.integritySeal,
-        updated_at: new Date().toISOString(),
-        is_deleted: entry.isDeleted
+        weightUnit: entry.weightUnit,
+        healthRecordType: entry.healthRecordType,
+        baskingTempC: entry.baskingTempC,
+        coolTempC: entry.coolTempC,
+        temperatureC: entry.temperatureC,
+        createdAt: entry.createdAt,
+        createdBy: entry.createdBy,
+        integritySeal: entry.integritySeal,
+        updatedAt: new Date().toISOString(),
+        isDeleted: entry.isDeleted
       };
 
       const { error } = await supabase.from('daily_logs').update(supabasePayload).eq('id', entry.id);
@@ -139,9 +156,10 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
       if (existing) {
         await dailyLogsCollection.update({ ...existing, isDeleted: true } as LogEntry & { id: string });
       }
+      return { id };
     },
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('daily_logs').update({ is_deleted: true }).eq('id', id);
+      const { error } = await supabase.from('daily_logs').update({ isDeleted: true }).eq('id', id);
       if (error) throw error;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['dailyLogs'] })

@@ -22,7 +22,16 @@ export const useTaskData = () => {
         const { data, error } = await supabase.from('tasks').select('*');
         if (error) throw error;
         
-        const mappedData: Task[] = data.map((item: Record<string, unknown>) => mapToCamelCase<Task>(item));
+        const camelCaseData = mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
+
+        const mappedData: Task[] = camelCaseData.map((item: Task): Task => ({
+          ...item,
+          id: item.id ?? crypto.randomUUID(),
+          title: item.title ?? "Untitled Task",
+          dueDate: item.dueDate ?? new Date().toISOString(),
+          completed: item.completed ?? false,
+          isDeleted: item.isDeleted ?? false,
+        }));
         
         for (const item of mappedData) {
           try {
@@ -41,8 +50,19 @@ export const useTaskData = () => {
   });
 
   const addTaskMutation = useMutation({
-    mutationFn: async (newTask: Partial<Task>) => {
+    onMutate: async (newTask: Partial<Task>) => {
       const task: Task = sanitizePayload({
+        ...newTask,
+        id: newTask.id || crypto.randomUUID(),
+        dueDate: newTask.dueDate || new Date().toISOString(),
+        completed: newTask.completed || false,
+        isDeleted: false
+      } as Task);
+      await tasksCollection.insert(task);
+      return { task };
+    },
+    mutationFn: async (newTask: Partial<Task>) => {
+      const task = sanitizePayload({
         ...newTask,
         id: newTask.id || crypto.randomUUID(),
         dueDate: newTask.dueDate || new Date().toISOString(),
@@ -64,53 +84,42 @@ export const useTaskData = () => {
         is_deleted: task.isDeleted
       };
 
-      try {
-        const { error } = await supabase.from('tasks').insert([supabasePayload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding task locally.");
-      }
-      await tasksCollection.insert(task);
-      return task;
+      const { error } = await supabase.from('tasks').insert([supabasePayload]);
+      if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
   });
 
   const completeTaskMutation = useMutation({
-    mutationFn: async (taskId: string) => {
+    onMutate: async (taskId: string) => {
       const task = tasks.find(t => t.id === taskId);
       if (!task) throw new Error("Task not found");
       
       const updatedTask = sanitizePayload({ ...task, completed: true });
-      
-      try {
-        const { error } = await supabase.from('tasks').update({ completed: true }).eq('id', taskId);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Completing task locally.");
-      }
       await tasksCollection.update(updatedTask);
-      return updatedTask;
+      return { updatedTask };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase.from('tasks').update({ completed: true }).eq('id', taskId);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
   });
 
   const deleteTaskMutation = useMutation({
-    mutationFn: async (taskId: string) => {
+    onMutate: async (taskId: string) => {
       const task = tasks.find(t => t.id === taskId);
       if (!task) throw new Error("Task not found");
       
       const updatedTask = sanitizePayload({ ...task, isDeleted: true });
-      
-      try {
-        const { error } = await supabase.from('tasks').update({ is_deleted: true }).eq('id', taskId);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Deleting task locally.");
-      }
       await tasksCollection.update(updatedTask);
+      return { updatedTask };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase.from('tasks').update({ is_deleted: true }).eq('id', taskId);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
   });
 
   return { 

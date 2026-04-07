@@ -22,7 +22,12 @@ export const createStandardCollection = <T extends { id: string }>(tableName: st
       if (error) throw error;
       return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item)) || [];
     },
-    sync: { enabled: false }
+    sync: { enabled: false },
+    // ARCHITECTURAL FIX: Dummy handlers satisfy the library's local insert validation 
+    // without triggering rogue network requests. TanStack Query still handles the network.
+    onInsert: async () => { return; },
+    onUpdate: async () => { return; },
+    onDelete: async () => { return; }
   });
 
   const singleDraftUpdate = async (draft: Partial<T> & { id: string }) => {
@@ -55,7 +60,11 @@ export const dailyLogsCollection = (() => {
       if (error) throw error;
       return (data as Record<string, unknown>[]).map(item => mapToCamelCase<LogEntry>(item)) || [];
     },
-    sync: { enabled: false }
+    sync: { enabled: false },
+    // ARCHITECTURAL FIX: Dummy handlers
+    onInsert: async () => { return; },
+    onUpdate: async () => { return; },
+    onDelete: async () => { return; }
   });
 
   const singleDraftUpdate = async (draft: Partial<LogEntry> & { id: string }) => {

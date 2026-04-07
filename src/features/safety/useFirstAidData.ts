@@ -32,34 +32,33 @@ export function useFirstAidData() {
   });
 
   const addFirstAidMutation = useMutation({
-    mutationFn: async (log: Omit<FirstAidLog, 'id' | 'created_at'>) => {
+    onMutate: async (log: Omit<FirstAidLog, 'id' | 'created_at'>) => {
       const payload: FirstAidLog = {
         ...log,
         id: crypto.randomUUID(),
         created_at: new Date().toISOString()
       } as FirstAidLog;
-      try {
-        const { error } = await supabase.from('first_aid').insert([payload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding first aid log locally.");
-      }
       await firstAidCollection.insert(payload);
+      return { payload };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['firstAid'] })
+    mutationFn: async (log: Omit<FirstAidLog, 'id' | 'created_at'>) => {
+      const payload = { ...log, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+      const { error } = await supabase.from('first_aid').insert([payload]);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['firstAid'] })
   });
 
   const deleteFirstAidMutation = useMutation({
-    mutationFn: async (id: string) => {
-      try {
-        const { error } = await supabase.from('first_aid').update({ is_deleted: true }).eq('id', id);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Deleting first aid log locally.");
-      }
+    onMutate: async (id: string) => {
       await firstAidCollection.update(id, (prev) => ({ ...prev, is_deleted: true }));
+      return { id };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['firstAid'] })
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('first_aid').update({ is_deleted: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['firstAid'] })
   });
 
   return {

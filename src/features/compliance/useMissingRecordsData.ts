@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { animalsCollection, dailyLogsCollection, medicalLogsCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { LogType, Animal, ClinicalNote, DailyLog } from '../../types';
+import { mapToCamelCase } from '../../lib/dataMapping';
 
 export interface MissingRecordAlert {
   id: string;
@@ -40,14 +41,15 @@ export function useMissingRecordsData() {
       try {
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
-        for (const item of data) {
+        const mappedData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
+        for (const item of mappedData) {
           try {
-            await animalsCollection.update(item as Animal);
+            await animalsCollection.update(item);
           } catch {
-            await animalsCollection.insert(item as Animal);
+            await animalsCollection.insert(item);
           }
         }
-        return data as Animal[];
+        return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
         return await animalsCollection.getAll();
@@ -61,14 +63,15 @@ export function useMissingRecordsData() {
       try {
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
-        for (const item of data) {
+        const mappedData = mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
+        for (const item of mappedData) {
           try {
-            await dailyLogsCollection.update(item as DailyLog);
+            await dailyLogsCollection.update(item);
           } catch {
-            await dailyLogsCollection.insert(item as DailyLog);
+            await dailyLogsCollection.insert(item);
           }
         }
-        return data as DailyLog[];
+        return mappedData;
       } catch {
         console.warn("Network unreachable. Serving daily logs from local vault.");
         return await dailyLogsCollection.getAll();
@@ -82,14 +85,15 @@ export function useMissingRecordsData() {
       try {
         const { data, error } = await supabase.from('medical_logs').select('*');
         if (error) throw error;
-        for (const item of data) {
+        const mappedData = mapToCamelCase<ClinicalNote>(data as Record<string, unknown>[]) as ClinicalNote[];
+        for (const item of mappedData) {
           try {
-            await medicalLogsCollection.update(item as ClinicalNote);
+            await medicalLogsCollection.update(item);
           } catch {
-            await medicalLogsCollection.insert(item as ClinicalNote);
+            await medicalLogsCollection.insert(item);
           }
         }
-        return data as ClinicalNote[];
+        return mappedData;
       } catch {
         console.warn("Network unreachable. Serving medical logs from local vault.");
         return await medicalLogsCollection.getAll();
@@ -100,7 +104,7 @@ export function useMissingRecordsData() {
   const isLoading = isLoadingAnimals || isLoadingDailyLogs || isLoadingMedicalLogs;
 
   const { alerts, complianceStats, categoryCompliance, husbandryStatus } = useMemo(() => {
-    const activeAnimals = animals.filter(a => !a.is_deleted && !a.archived);
+    const activeAnimals = animals.filter(a => !a.isDeleted && !a.archived);
     if (!activeAnimals.length) return { alerts: [], complianceStats: [], categoryCompliance: {}, husbandryStatus: [] };
     
     const allAlerts: MissingRecordAlert[] = [];
@@ -188,7 +192,7 @@ export function useMissingRecordsData() {
           category: 'Husbandry'
         });
       } else {
-        const lastDate = new Date(latestWeight.log_date as string);
+        const lastDate = new Date(latestWeight.logDate as string);
         const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
         if (diffDays > weightThreshold) {
           allAlerts.push({
@@ -224,7 +228,7 @@ export function useMissingRecordsData() {
           category: 'Husbandry'
         });
       } else {
-        const lastDate = new Date(latestFeed.log_date as string);
+        const lastDate = new Date(latestFeed.logDate as string);
         const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
         if (diffDays > feedThreshold) {
           allAlerts.push({

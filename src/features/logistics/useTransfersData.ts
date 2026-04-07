@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { transfersCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { Transfer, TransferType, TransferStatus } from '../../types';
+import { mapToCamelCase } from '../../lib/dataMapping';
 
 const sanitizePayload = <T extends Record<string, unknown>>(payload: T): T => {
   const sanitized = { ...payload };
@@ -10,19 +11,6 @@ const sanitizePayload = <T extends Record<string, unknown>>(payload: T): T => {
   });
   return sanitized;
 };
-
-interface SupabaseTransfer {
-  id: string;
-  animal_id: string | null;
-  animal_name: string | null;
-  transfer_type: string | null;
-  date: string | null;
-  institution: string | null;
-  transport_method: string | null;
-  cites_article_10_ref: string | null;
-  status: string | null;
-  is_deleted: boolean;
-}
 
 export const useTransfersData = () => {
   const queryClient = useQueryClient();
@@ -33,17 +21,23 @@ export const useTransfersData = () => {
       try {
         const { data, error } = await supabase.from('transfers').select('*');
         if (error) throw error;
-        const transfers: Transfer[] = (data as unknown as SupabaseTransfer[]).map((item: SupabaseTransfer) => ({
-          id: item.id,
-          animalId: item.animal_id,
-          animalName: item.animal_name || 'Unknown',
-          transferType: (item.transfer_type as TransferType) || TransferType.ARRIVAL,
-          date: item.date || new Date().toISOString(),
-          institution: item.institution || 'Unknown',
-          transportMethod: item.transport_method || 'Unknown',
-          citesArticle10Ref: item.cites_article_10_ref || 'N/A',
-          status: (item.status as TransferStatus) || TransferStatus.PENDING,
-          isDeleted: item.is_deleted
+
+        if (!data) return [];
+
+        const camelCaseData = mapToCamelCase<Transfer>(data as Record<string, unknown>[]) as Transfer[];
+
+        const transfers: Transfer[] = camelCaseData.map((item: Transfer): Transfer => ({
+          ...item,
+          id: (item.id as string) ?? crypto.randomUUID(),
+          animalId: (item.animalId as string) ?? "",
+          animalName: (item.animalName as string) ?? "Unknown",
+          transferType: (item.transferType as TransferType) ?? TransferType.ARRIVAL,
+          date: (item.date as string) ?? new Date().toISOString(),
+          institution: (item.institution as string) ?? "Unknown",
+          transportMethod: (item.transportMethod as string) ?? "Unknown",
+          citesArticle10Ref: (item.citesArticle10Ref as string) ?? "N/A",
+          status: (item.status as TransferStatus) ?? TransferStatus.PENDING,
+          isDeleted: (item.isDeleted as boolean) ?? false,
         }));
         
         for (const item of transfers) {
@@ -67,8 +61,8 @@ export const useTransfersData = () => {
       await transfersCollection.insert(payload);
       return { payload };
     },
-    mutationFn: async (transfer: Omit<Transfer, 'id'>, variables, context) => {
-      const payload = (context as { payload: Transfer })?.payload || { ...transfer, id: crypto.randomUUID(), isDeleted: false };
+    mutationFn: async (transfer: Omit<Transfer, 'id'>) => {
+      const payload = { ...transfer, id: crypto.randomUUID(), isDeleted: false };
       const supabasePayload = {
         id: payload.id,
         animal_id: payload.animalId,
@@ -91,7 +85,19 @@ export const useTransfersData = () => {
   const updateTransferMutation = useMutation({
     mutationFn: async (transfer: Transfer) => {
       try {
-        const { error } = await supabase.from('transfers').update(transfer).eq('id', transfer.id);
+        const supabasePayload = {
+          id: transfer.id,
+          animal_id: transfer.animalId,
+          animal_name: transfer.animalName,
+          transfer_type: transfer.transferType,
+          date: transfer.date,
+          institution: transfer.institution,
+          transport_method: transfer.transportMethod,
+          cites_article_10_ref: transfer.citesArticle10Ref,
+          status: transfer.status,
+          is_deleted: transfer.isDeleted
+        };
+        const { error } = await supabase.from('transfers').update(supabasePayload).eq('id', transfer.id);
         if (error) throw error;
       } catch {
         console.warn("Offline: Updating transfer locally.");
@@ -118,7 +124,7 @@ export const useTransfersData = () => {
   });
 
   return {
-    transfers: transfers.filter(t => !t.is_deleted),
+    transfers: transfers.filter(t => !t.isDeleted),
     isLoading,
     addTransfer: addTransferMutation.mutateAsync,
     updateTransfer: updateTransferMutation.mutateAsync,

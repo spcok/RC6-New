@@ -14,7 +14,22 @@ export const useAnimalsData = () => {
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
 
-        const mappedData: Animal[] = data.map((item: Record<string, unknown>) => mapToCamelCase<Animal>(item));
+        if (!data) return [];
+
+        const camelCaseData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
+
+        const mappedData: Animal[] = camelCaseData.map((item: Animal): Animal => ({
+          ...item,
+          id: (item.id as string) ?? crypto.randomUUID(),
+          name: item.name ?? "Unknown",
+          species: item.species ?? "Unknown Species",
+          category: item.category ?? AnimalCategory.ALL,
+          location: item.location ?? "Unknown",
+          hazardRating: item.hazardRating ?? HazardRating.LOW,
+          isVenomous: item.isVenomous ?? false,
+          weightUnit: item.weightUnit ?? 'g',
+          isDeleted: item.isDeleted ?? false,
+        }));
 
         for (const item of mappedData) {
           try {
@@ -39,7 +54,6 @@ export const useAnimalsData = () => {
       return { id, newAnimal };
     },
     mutationFn: async (animal: Omit<Animal, 'id'>) => {
-      // Use the ID generated in onMutate if available, or generate a new one
       const id = crypto.randomUUID();
       const supabasePayload = {
         id,
@@ -107,6 +121,7 @@ export const useAnimalsData = () => {
   const updateAnimalMutation = useMutation({
     onMutate: async (animal: Animal) => {
       await animalsCollection.update(animal as Animal & { id: string });
+      return { animal };
     },
     mutationFn: async (animal: Animal) => {
       const supabasePayload = {

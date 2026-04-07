@@ -52,14 +52,14 @@ export function useTimesheetData() {
       await timesheetsCollection.insert(newShift);
       return { newShift };
     },
-    mutationFn: async (staffName: string, variables, context) => {
-      const newShift = (context as { newShift: Timesheet })?.newShift || { id: crypto.randomUUID(), staffName };
+    mutationFn: async (staffName: string) => {
+      const newShift = { id: crypto.randomUUID(), staffName };
       const cloudPayload = {
         id: newShift.id,
         staff_name: newShift.staffName,
-        date: newShift.date,
-        clock_in: newShift.clockIn,
-        status: newShift.status,
+        date: new Date().toISOString().split('T')[0],
+        clock_in: new Date().toISOString(),
+        status: 'Active',
         is_deleted: false,
         created_at: new Date().toISOString()
       };

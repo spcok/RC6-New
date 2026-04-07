@@ -34,7 +34,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
       try {
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
-        const mappedData = data.map(item => mapToCamelCase<Animal>(item));
+        const mappedData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
         for (const item of mappedData) {
           try {
             await animalsCollection.update(item);
@@ -57,7 +57,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
       try {
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
-        const mappedData = data.map(item => mapToCamelCase<DailyLog>(item));
+        const mappedData = mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
         for (const item of mappedData) {
           try {
             await dailyLogsCollection.update(item);
@@ -80,7 +80,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
       try {
         const { data, error } = await supabase.from('tasks').select('*');
         if (error) throw error;
-        const mappedData = data.map(item => mapToCamelCase<Task>(item));
+        const mappedData = mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
         for (const item of mappedData) {
           try {
             await tasksCollection.update(item);
@@ -129,8 +129,8 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
 
   // Compute Task Stats
   const taskStats = useMemo(() => {
-    const pendingTasks = tasks.filter(t => !t.completed && t.type !== 'HEALTH').map(t => ({ id: t.id, title: t.title, due_date: t.due_date }));
-    const pendingHealth = tasks.filter(t => !t.completed && t.type === 'HEALTH').map(t => ({ id: t.id, title: t.title, due_date: t.due_date }));
+    const pendingTasks = tasks.filter(t => !t.completed && t.type !== 'HEALTH').map(t => ({ id: t.id, title: t.title, dueDate: t.dueDate }));
+    const pendingHealth = tasks.filter(t => !t.completed && t.type === 'HEALTH').map(t => ({ id: t.id, title: t.title, dueDate: t.dueDate }));
     return { pendingTasks, pendingHealth };
   }, [tasks]);
 

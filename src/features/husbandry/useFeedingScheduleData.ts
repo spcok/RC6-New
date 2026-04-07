@@ -41,26 +41,29 @@ export function useFeedingScheduleData(date: string) {
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
         
-        const mappedData: LogEntry[] = (data as unknown as SupabaseLogEntry[]).map((item: SupabaseLogEntry) => ({
-          id: item.id,
-          animalId: item.animal_id,
-          logType: item.log_type as LogType,
-          logDate: item.log_date,
-          value: item.value,
-          notes: item.notes,
-          userInitials: item.user_initials,
-          weightGrams: item.weight_grams,
-          weight: item.weight,
-          weightUnit: item.weight_unit,
-          healthRecordType: item.health_record_type,
-          baskingTempC: item.basking_temp_c,
-          coolTempC: item.cool_temp_c,
-          temperatureC: item.temperature_c,
-          createdAt: item.created_at,
-          createdBy: item.created_by,
-          integritySeal: item.integrity_seal,
-          updatedAt: item.updated_at,
-          isDeleted: item.is_deleted
+        const camelCaseData = mapToCamelCase<LogEntry>(data as Record<string, unknown>[]) as LogEntry[];
+
+        const mappedData: LogEntry[] = camelCaseData.map((item: LogEntry): LogEntry => ({
+          ...item,
+          id: item.id ?? crypto.randomUUID(),
+          animalId: item.animalId ?? "",
+          logType: item.logType ?? LogType.GENERAL,
+          logDate: item.logDate ?? new Date().toISOString(),
+          value: item.value ?? "",
+          notes: item.notes ?? "",
+          userInitials: item.userInitials ?? "",
+          weightGrams: item.weightGrams ?? 0,
+          weight: item.weight ?? 0,
+          weightUnit: item.weightUnit ?? 'g',
+          healthRecordType: item.healthRecordType ?? "",
+          baskingTempC: item.baskingTempC ?? 0,
+          coolTempC: item.coolTempC ?? 0,
+          temperatureC: item.temperatureC ?? 0,
+          createdAt: item.createdAt ?? new Date().toISOString(),
+          createdBy: item.createdBy ?? "",
+          integritySeal: item.integritySeal ?? "",
+          updatedAt: item.updatedAt ?? new Date().toISOString(),
+          isDeleted: item.isDeleted ?? false,
         }));
         
         for (const item of mappedData) {

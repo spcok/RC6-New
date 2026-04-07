@@ -22,30 +22,29 @@ export const useSafetyDrillData = () => {
   });
 
   const addDrillLogMutation = useMutation({
-    mutationFn: async (newDrill: Omit<SafetyDrill, 'id'>) => {
+    onMutate: async (newDrill: Omit<SafetyDrill, 'id'>) => {
       const payload: SafetyDrill = { ...newDrill, id: crypto.randomUUID() } as SafetyDrill;
-      try {
-        const { error } = await supabase.from('safety_drills').insert([payload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding safety drill locally.");
-      }
       await safetyDrillsCollection.insert(payload);
+      return { payload };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['safetyDrills'] })
+    mutationFn: async (newDrill: Omit<SafetyDrill, 'id'>) => {
+      const payload = { ...newDrill, id: crypto.randomUUID() };
+      const { error } = await supabase.from('safety_drills').insert([payload]);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['safetyDrills'] })
   });
 
   const deleteDrillLogMutation = useMutation({
-    mutationFn: async (id: string) => {
-      try {
-        const { error } = await supabase.from('safety_drills').update({ is_deleted: true }).eq('id', id);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Deleting safety drill locally.");
-      }
+    onMutate: async (id: string) => {
       await safetyDrillsCollection.update(id, (prev) => ({ ...prev, is_deleted: true }));
+      return { id };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['safetyDrills'] })
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('safety_drills').update({ is_deleted: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['safetyDrills'] })
   });
 
   return {

@@ -20,13 +20,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
-  const value: AppContextType = {
+  // ARCHITECTURAL FIX: Memoize context value to prevent massive UI re-render cascades
+  const value: AppContextType = useMemo(() => ({
     orgProfile: {
       name: settings?.org_name || DEFAULT_ORG_PROFILE.name,
       logo_url: settings?.logo_url || DEFAULT_ORG_PROFILE.logo_url,
     },
     isLoading,
-  };
+  }), [settings?.org_name, settings?.logo_url, isLoading]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

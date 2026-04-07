@@ -22,34 +22,33 @@ export const useIncidentData = () => {
   });
 
   const addIncidentMutation = useMutation({
-    mutationFn: async (incident: Omit<Incident, 'id' | 'created_at'>) => {
+    onMutate: async (incident: Omit<Incident, 'id' | 'created_at'>) => {
       const payload: Incident = {
         ...incident,
         id: crypto.randomUUID(),
         created_at: new Date().toISOString()
       } as Incident;
-      try {
-        const { error } = await supabase.from('incidents').insert([payload]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Adding incident locally.");
-      }
       await incidentsCollection.insert(payload);
+      return { payload };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['incidents'] })
+    mutationFn: async (incident: Omit<Incident, 'id' | 'created_at'>) => {
+      const payload = { ...incident, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+      const { error } = await supabase.from('incidents').insert([payload]);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['incidents'] })
   });
 
   const deleteIncidentMutation = useMutation({
-    mutationFn: async (id: string) => {
-      try {
-        const { error } = await supabase.from('incidents').update({ is_deleted: true }).eq('id', id);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Deleting incident locally.");
-      }
+    onMutate: async (id: string) => {
       await incidentsCollection.update(id, (prev) => ({ ...prev, is_deleted: true }));
+      return { id };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['incidents'] })
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('incidents').update({ is_deleted: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['incidents'] })
   });
 
   return {

@@ -80,30 +80,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Bypass Supabase API calls
-  if (event.request.url.includes('supabase.co')) {
-    return;
-  }
-
   const url = new URL(event.request.url);
 
-  // Rule 1: Strict Shield Bypass (Network Only)
-  if (url.hostname.includes('supabase.co') && (
-    url.pathname.includes('/auth/v1/') ||
-    url.pathname.includes('/functions/v1/')
-  )) {
-    return; // Network Only
-  }
-
-  // Rule 2: SWR for Media (Supabase Storage)
-  if (url.pathname.includes('/storage/v1/object/public/')) {
-    event.respondWith(staleWhileRevalidate(event.request, MEDIA_CACHE));
+  // ARCHITECTURAL FIX: Strict bypass for ALL Supabase Data/Auth API calls.
+  // TanStack Query must strictly manage this cache. Do not intercept here.
+  if (url.hostname.includes('supabase.co') && !url.pathname.includes('/storage/v1/object/public/')) {
     return;
   }
 
-  // Rule 3: Targeted Vault Caching (Strictly /rest/v1/)
-  if (url.hostname.includes('supabase.co') && url.pathname.includes('/rest/v1/')) {
-    event.respondWith(networkFirstWithTimeout(event.request, COMPLIANCE_CACHE));
+  // Rule 2: SWR for Media (Supabase Storage is okay to cache)
+  if (url.pathname.includes('/storage/v1/object/public/')) {
+    event.respondWith(staleWhileRevalidate(event.request, MEDIA_CACHE));
     return;
   }
 
@@ -148,32 +135,4 @@ async function staleWhileRevalidate(request, cacheName) {
   });
 
   return cachedResponse || fetchPromise;
-}
-
-async function networkFirstWithTimeout(request, cacheName) {
-  const timeoutPromise = new Promise((resolve) => 
-    setTimeout(() => resolve(null), 5000)
-  );
-
-  try {
-    const networkResponse = await Promise.race([
-      fetch(request),
-      timeoutPromise
-    ]);
-
-    if (networkResponse && networkResponse.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
-      return networkResponse;
-    }
-  } catch (error) {
-    // Network failed
-  }
-
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
-  }
-
-  return new Response('Offline and no cached data available', { status: 503 });
 }

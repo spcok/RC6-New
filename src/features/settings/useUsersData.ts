@@ -16,26 +16,41 @@ export function useUsersData() {
   const isLoading = isLoadingUsers || isLoadingRoles;
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string, updates: Partial<User> }) => {
+    onMutate: async ({ id, updates }: { id: string, updates: Partial<User> }) => {
       const existing = users.find(u => u.id === id);
       if (existing) {
-        await usersCollection.update({ ...existing, ...updates });
+        await usersCollection.update({ ...existing, ...updates } as User & { id: string });
       }
+      return { id, updates };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    mutationFn: async ({ id, updates }: { id: string, updates: Partial<User> }) => {
+      const { error } = await supabase.from('users').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 
   const deleteUserMutation = useMutation({
-    mutationFn: async (id: string) => {
+    onMutate: async (id: string) => {
       const existing = users.find(u => u.id === id);
       if (existing) {
-        await usersCollection.update({ ...existing, is_deleted: true });
+        await usersCollection.update({ ...existing, is_deleted: true } as User & { id: string });
       }
+      return { id };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('users').update({ is_deleted: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 
   const addUserMutation = useMutation({
+    onMutate: async (userData: { email: string; password?: string; profileData: Partial<User> }) => {
+      // We don't have the new user ID yet, so we can't insert into local vault until we get the response.
+      // This is an exception to the rule because the server generates the ID.
+      return { userData };
+    },
     mutationFn: async (userData: { email: string; password?: string; profileData: Partial<User> }) => {
       const { data, error } = await supabase.functions.invoke('create-staff-account', {
         body: userData
@@ -46,10 +61,9 @@ export function useUsersData() {
       await usersCollection.insert(newUser);
       return data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 
-  // Role permissions mutation needs to be kept as is if not in database.ts
   const updateRolePermissionsMutation = useMutation({
     mutationFn: async ({ role, updates }: { role: string, updates: Partial<RolePermissionConfig> }) => {
       const { error } = await supabase
@@ -58,7 +72,7 @@ export function useUsersData() {
         .eq('id', role.toLowerCase());
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['role_permissions'] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['role_permissions'] }),
   });
 
   return { 

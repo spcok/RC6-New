@@ -38,16 +38,15 @@ export function useOrgSettings() {
   });
 
   const saveSettingsMutation = useMutation({
-    mutationFn: async (newSettings: OrgProfileSettings) => {
-      try {
-        const { error } = await supabase.from('org_settings').upsert([newSettings]);
-        if (error) throw error;
-      } catch {
-        console.warn("Offline: Updating settings locally.");
-      }
+    onMutate: async (newSettings: OrgProfileSettings) => {
       await orgSettingsCollection.update(newSettings.id, () => newSettings);
+      return { newSettings };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['orgSettings'] })
+    mutationFn: async (newSettings: OrgProfileSettings) => {
+      const { error } = await supabase.from('org_settings').upsert([newSettings]);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['orgSettings'] })
   });
 
   return { 
