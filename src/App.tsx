@@ -8,15 +8,21 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const initialize = useAuthStore(state => state.initialize);
+  const currentUser = useAuthStore(state => state.currentUser);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
+  const authContext = {
+    isAuthenticated: !!currentUser,
+    permissions: currentUser?.permissions,
+  };
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <RouterProvider router={router} context={{ auth: authContext }} />
       </QueryClientProvider>
     </ErrorBoundary>
   );

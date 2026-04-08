@@ -1,7 +1,26 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
-import { User } from '../types';
+import { User, UserPermissions } from '../types';
 import { Session } from '@supabase/supabase-js';
+
+// Helper to calculate permissions
+const calculatePermissions = (role: string): UserPermissions => {
+  const roleUpper = role.toUpperCase();
+  const isAdmin = roleUpper === 'OWNER' || roleUpper === 'ADMIN';
+  
+  // Default locked permissions
+  const permissions: UserPermissions = {
+    dashboard: isAdmin, dailyLog: isAdmin, tasks: isAdmin, medical: isAdmin,
+    movements: isAdmin, safety: isAdmin, maintenance: isAdmin, settings: isAdmin,
+    flightRecords: isAdmin, feedingSchedule: isAdmin, attendance: isAdmin,
+    holidayApprover: isAdmin, attendanceManager: isAdmin, missingRecords: isAdmin,
+    reports: isAdmin, rounds: isAdmin, view_archived_records: isAdmin,
+    userManagement: isAdmin, viewMedications: isAdmin, viewQuarantine: isAdmin
+  };
+
+  return permissions;
+};
 
 interface AuthState {
   currentUser: User | null;
@@ -25,111 +44,116 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, fallbackError: string):
 
 let initPromise: Promise<void> | null = null;
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  currentUser: null,
-  session: null,
-  isLoading: true,
-  hasInitialized: false,
-  error: null,
-  isUiLocked: false,
-  setUiLocked: (locked) => set({ isUiLocked: locked }),
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      currentUser: null,
+      session: null,
+      isLoading: true,
+      hasInitialized: false,
+      error: null,
+      isUiLocked: false,
+      setUiLocked: (locked) => set({ isUiLocked: locked }),
 
-  initialize: async () => {
-    if (get().hasInitialized) return;
-    if (initPromise) return initPromise;
+      initialize: async () => {
+        if (get().hasInitialized) return;
+        if (initPromise) return initPromise;
 
-    initPromise = (async () => {
-      try {
-        if (navigator.onLine) {
-          const { data: { session } } = await withTimeout(
-             supabase.auth.getSession(), 
-             3000, 
-             "Session check timed out"
-          );
-          if (session && session.user) {
-            const user = session.user;
-            set({ 
-              session,
-              currentUser: {
-                id: user.id,
-                email: user.email || '',
-                name: user.user_metadata?.name || user.email || 'Unknown User',
-                role: user.user_metadata?.role || 'GUEST',
-                initials: (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase(),
-              },
-              hasInitialized: true,
-              isLoading: false 
-            });
-            return;
+        initPromise = (async () => {
+          try {
+            if (navigator.onLine) {
+              const { data: { session } } = await withTimeout(
+                supabase.auth.getSession(),
+                3000,
+                "Session check timed out"
+              );
+              if (session && session.user) {
+                const user = session.user;
+                const role = user.user_metadata?.role || 'GUEST';
+                set({
+                  session,
+                  currentUser: {
+                    id: user.id,
+                    email: user.email || '',
+                    name: user.user_metadata?.name || user.email || 'Unknown User',
+                    role: role,
+                    initials: (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase(),
+                    permissions: calculatePermissions(role),
+                  },
+                  hasInitialized: true,
+                  isLoading: false
+                });
+                return;
+              }
+            }
+            set({ hasInitialized: true, isLoading: false });
+          } catch (error: unknown) {
+            console.warn('Auth init skipped/timed out:', error);
+            set({ hasInitialized: true, isLoading: false });
           }
+        })();
+        return initPromise;
+      },
+
+      login: async (email: string, password: string) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          if (!navigator.onLine) {
+            throw new Error("Network connection required for login.");
+          }
+
+          const authResponse = await withTimeout(
+            supabase.auth.signInWithPassword({ email, password }),
+            5000,
+            "Supabase connection timed out."
+          );
+
+          if (authResponse.error) {
+            throw new Error(authResponse.error.message);
+          }
+
+          const session = authResponse.data.session;
+          const user = authResponse.data.user;
+
+          if (!session || !user) {
+            throw new Error("Login failed to establish session.");
+          }
+
+          const role = user.user_metadata?.role || 'GUEST';
+          set({
+            session,
+            currentUser: {
+              id: user.id,
+              email: user.email || '',
+              name: user.user_metadata?.name || user.email || 'Unknown User',
+              role: role,
+              initials: (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase(),
+              permissions: calculatePermissions(role),
+            },
+            isLoading: false
+          });
+
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          set({ error: errorMessage, isLoading: false });
+          throw error;
         }
-        set({ hasInitialized: true, isLoading: false });
-      } catch (error: unknown) {
-        console.warn('Auth init skipped/timed out:', error);
-        set({ hasInitialized: true, isLoading: false });
-      }
-    })();
-    return initPromise;
-  },
+      },
 
-  login: async (email: string, password: string) => {
-    set({ isLoading: true, error: null });
-
-    try {
-      if (!navigator.onLine) {
-        throw new Error("Network connection required for login.");
-      }
-
-      console.log("📡 [Auth] Attempting Live Supabase Login...");
-      
-      const authResponse = await withTimeout(
-        supabase.auth.signInWithPassword({ email, password }), 
-        5000, 
-        "Supabase connection timed out."
-      );
-
-      if (authResponse.error) {
-        if (authResponse.error.message.toLowerCase().includes('credentials') || authResponse.error.message.toLowerCase().includes('invalid')) {
-          throw new Error("Invalid email or password.");
+      logout: async () => {
+        set({ isLoading: true });
+        try {
+          if (navigator.onLine) {
+            await withTimeout(supabase.auth.signOut(), 2000, "Logout timeout").catch(e => console.warn(e));
+          }
+        } finally {
+          set({ currentUser: null, session: null, isLoading: false, error: null });
         }
-        throw new Error(authResponse.error.message);
-      } 
-      
-      const session = authResponse.data.session;
-      const user = authResponse.data.user;
-
-      if (!session || !user) {
-        throw new Error("Login failed to establish session.");
       }
-
-      set({
-        session,
-        currentUser: {
-          id: user.id,
-          email: user.email || '',
-          name: user.user_metadata?.name || user.email || 'Unknown User',
-          role: user.user_metadata?.role || 'GUEST',
-          initials: (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase(),
-        },
-        isLoading: false
-      });
-
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error("❌ [Auth] Final Rejection:", errorMessage);
-      set({ error: errorMessage, isLoading: false });
-      throw error; 
+    }),
+    {
+      name: 'auth-storage',
     }
-  },
-
-  logout: async () => {
-    set({ isLoading: true });
-    try {
-      if (navigator.onLine) {
-        await withTimeout(supabase.auth.signOut(), 2000, "Logout timeout").catch(e => console.warn(e));
-      }
-    } finally {
-      set({ currentUser: null, session: null, isLoading: false, error: null });
-    }
-  }
-}));
+  )
+);

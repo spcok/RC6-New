@@ -227,7 +227,7 @@ const RoleMatrixView: React.FC = () => {
     },
     {
       title: 'Veterinary & Medical',
-      keys: ['view_medical', 'add_clinical_notes', 'prescribe_medications', 'administer_medications', 'manage_quarantine']
+      keys: ['view_medical', 'add_clinical_notes', 'view_medications', 'prescribe_medications', 'administer_medications', 'view_quarantine', 'manage_quarantine']
     },
     {
       title: 'Transfers & Logistics',

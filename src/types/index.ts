@@ -253,6 +253,8 @@ export interface UserPermissions {
   rounds: boolean;
   view_archived_records?: boolean;
   userManagement?: boolean;
+  viewMedications?: boolean;
+  viewQuarantine?: boolean;
 }
 
 export interface UserProfile {
@@ -289,6 +291,8 @@ export interface RolePermissionConfig {
   // Medical
   viewMedical: boolean;
   addClinicalNotes: boolean;
+  viewMedications: boolean;
+  viewQuarantine: boolean;
   prescribeMedications: boolean;
   administerMedications: boolean;
   manageQuarantine: boolean;

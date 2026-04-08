@@ -8,7 +8,7 @@ const lockedPermissions = {
   view_daily_logs: false, create_daily_logs: false, edit_daily_logs: false,
   view_tasks: false, complete_tasks: false, manage_tasks: false,
   view_daily_rounds: false, log_daily_rounds: false,
-  view_medical: false, add_clinical_notes: false, prescribe_medications: false, administer_medications: false, manage_quarantine: false,
+  view_medical: false, view_medications: false, view_quarantine: false, add_clinical_notes: false, prescribe_medications: false, administer_medications: false, manage_quarantine: false,
   view_movements: false, log_internal_movements: false, manage_external_transfers: false,
   view_incidents: false, report_incidents: false, manage_incidents: false,
   view_maintenance: false, report_maintenance: false, resolve_maintenance: false,

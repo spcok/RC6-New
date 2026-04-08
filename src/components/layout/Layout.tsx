@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Outlet, useNavigate, useLocation, Link } from '@tanstack/react-router';
+import { useState } from 'react';
+import { Outlet, useLocation, Link } from '@tanstack/react-router';
 import { LayoutContext } from './LayoutContext';
-import { usePermissions } from '../../hooks/usePermissions';
 import { useAuthStore } from '../../store/authStore';
 import { useSupabaseRealtime } from '../../hooks/useSupabaseRealtime';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
@@ -10,10 +9,20 @@ import {
   Stethoscope, ArrowRightLeft, Plane, Wrench, AlertTriangle, 
   Cross, ShieldAlert, Clock, Calendar, Users, FileCheck, 
   BarChart2, Settings, HelpCircle, LogOut, Menu, X, ChevronLeft, ChevronRight,
-  Loader2, Accessibility, Pill
+  Accessibility, Pill
 } from 'lucide-react';
 import { A11yControlPanel } from './A11yControlPanel';
 import { ClockInButton } from '../staff/ClockInButton';
+import { UserPermissions } from '../../types';
+
+const lockedPermissions: UserPermissions = {
+  dashboard: false, dailyLog: false, tasks: false, medical: false,
+  movements: false, safety: false, maintenance: false, settings: false,
+  flightRecords: false, feedingSchedule: false, attendance: false,
+  holidayApprover: false, attendanceManager: false, missingRecords: false,
+  reports: false, rounds: false, view_archived_records: false,
+  userManagement: false, viewMedications: false, viewQuarantine: false
+};
 
 const NAVIGATION_GROUPS = [
   {
@@ -25,9 +34,9 @@ const NAVIGATION_GROUPS = [
   {
     title: 'Husbandry',
     items: [
-      { name: 'Daily Logs', path: '/daily-log', icon: ClipboardList, permKey: 'view_daily_logs' },
-      { name: 'Daily Rounds', path: '/daily-rounds', icon: CheckSquare, permKey: 'view_daily_rounds' },
-      { name: 'Tasks', path: '/tasks', icon: CheckSquare, permKey: 'view_tasks' },
+      { name: 'Daily Logs', path: '/daily-log', icon: ClipboardList, permKey: 'dailyLog' },
+      { name: 'Daily Rounds', path: '/daily-rounds', icon: CheckSquare, permKey: 'rounds' },
+      { name: 'Tasks', path: '/tasks', icon: CheckSquare, permKey: 'tasks' },
       { name: 'Feeding Schedule', path: '/feeding-schedule', icon: CalendarDays, permKey: null },
     ]
   },
@@ -35,41 +44,41 @@ const NAVIGATION_GROUPS = [
     title: 'Animals',
     items: [
       { name: 'Animals', path: '/animals', icon: ClipboardList, permKey: null },
-      { name: 'Clinical Notes', path: '/medical', icon: Stethoscope, permKey: 'view_medical' },
-      { name: 'Medications', path: '/medications', icon: Pill, permKey: 'view_medical' },
-      { name: 'Quarantine', path: '/quarantine', icon: ShieldAlert, permKey: 'view_medical' },
+      { name: 'Clinical Notes', path: '/medical', icon: Stethoscope, permKey: 'medical' },
+      { name: 'Medications', path: '/medications', icon: Pill, permKey: 'viewMedications' },
+      { name: 'Quarantine', path: '/quarantine', icon: ShieldAlert, permKey: 'viewQuarantine' },
     ]
   },
   {
     title: 'Logistics',
     items: [
-      { name: 'Movements', path: '/movements', icon: ArrowRightLeft, permKey: 'view_movements' },
+      { name: 'Movements', path: '/movements', icon: ArrowRightLeft, permKey: 'movements' },
       { name: 'Flight Records', path: '/flights', icon: Plane, permKey: null },
     ]
   },
   {
     title: 'Safety',
     items: [
-      { name: 'Maintenance', path: '/site-maintenance', icon: Wrench, permKey: 'view_maintenance' },
-      { name: 'Incidents', path: '/incidents', icon: AlertTriangle, permKey: 'view_incidents' },
-      { name: 'First Aid', path: '/first-aid', icon: Cross, permKey: 'view_first_aid' },
-      { name: 'Safety Drills', path: '/safety-drills', icon: ShieldAlert, permKey: 'view_safety_drills' },
+      { name: 'Maintenance', path: '/site-maintenance', icon: Wrench, permKey: 'maintenance' },
+      { name: 'Incidents', path: '/incidents', icon: AlertTriangle, permKey: 'safety' },
+      { name: 'First Aid', path: '/first-aid', icon: Cross, permKey: 'safety' },
+      { name: 'Safety Drills', path: '/safety-drills', icon: ShieldAlert, permKey: 'safety' },
     ]
   },
   {
     title: 'Staff',
     items: [
-      { name: 'Timesheets', path: '/staff-timesheets', icon: Clock, permKey: 'submit_timesheets' },
-      { name: 'Holidays', path: '/staff-holidays', icon: Calendar, permKey: 'request_holidays' },
+      { name: 'Timesheets', path: '/staff-timesheets', icon: Clock, permKey: 'attendance' },
+      { name: 'Holidays', path: '/staff-holidays', icon: Calendar, permKey: 'attendance' },
       { name: 'Rota', path: '/staff-rota', icon: Users, permKey: null },
     ]
   },
   {
     title: 'System',
     items: [
-      { name: 'Compliance', path: '/compliance', icon: FileCheck, permKey: 'view_missing_records' },
-      { name: 'Reports', path: '/reports', icon: BarChart2, permKey: 'generate_reports' },
-      { name: 'Settings', path: '/settings', icon: Settings, permKey: 'view_settings' },
+      { name: 'Compliance', path: '/compliance', icon: FileCheck, permKey: 'missingRecords' },
+      { name: 'Reports', path: '/reports', icon: BarChart2, permKey: 'reports' },
+      { name: 'Settings', path: '/settings', icon: Settings, permKey: 'settings' },
       { name: 'Help', path: '/help', icon: HelpCircle, permKey: null },
     ]
   }
@@ -77,52 +86,14 @@ const NAVIGATION_GROUPS = [
 
 export default function Layout() {
   useSupabaseRealtime();
-  const navigate = useNavigate();
   const location = useLocation();
   const currentUser = useAuthStore(s => s.currentUser);
   const logout = useAuthStore(s => s.logout);
-  const permissions = usePermissions();
+  const permissions = currentUser?.permissions || lockedPermissions;
   const { isOnline } = useNetworkStatus();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isA11yOpen, setIsA11yOpen] = useState(false);
-
-  useEffect(() => {
-    if (permissions.isLoading) return; 
-
-    const path = location.pathname;
-    let isAllowed = true;
-
-    if (path.startsWith('/medical') && !permissions.view_medical) isAllowed = false;
-    else if (path.startsWith('/medications') && !permissions.view_medical) isAllowed = false;
-    else if (path.startsWith('/quarantine') && !permissions.view_medical) isAllowed = false;
-    else if (path.startsWith('/daily-log') && !permissions.view_daily_logs) isAllowed = false;
-    else if (path.startsWith('/tasks') && !permissions.view_tasks) isAllowed = false;
-    else if (path.startsWith('/daily-rounds') && !permissions.view_daily_rounds) isAllowed = false;
-    else if (path.startsWith('/movements') && !permissions.view_movements) isAllowed = false;
-    else if (path.startsWith('/site-maintenance') && !permissions.view_maintenance) isAllowed = false;
-    else if (path.startsWith('/incidents') && !permissions.view_incidents) isAllowed = false;
-    else if (path.startsWith('/first-aid') && !permissions.view_first_aid) isAllowed = false;
-    else if (path.startsWith('/safety-drills') && !permissions.view_safety_drills) isAllowed = false;
-    else if (path.startsWith('/staff-timesheets') && !permissions.submit_timesheets) isAllowed = false;
-    else if (path.startsWith('/staff-holidays') && !permissions.request_holidays) isAllowed = false;
-    else if (path.startsWith('/compliance') && !permissions.view_missing_records) isAllowed = false;
-    else if (path.startsWith('/reports') && !permissions.generate_reports) isAllowed = false;
-    else if (path.startsWith('/settings') && !permissions.view_settings) isAllowed = false;
-
-    if (!isAllowed) {
-      console.warn('🛠️ [Security QA] Unauthorized route access blocked.');
-      navigate({ to: '/', replace: true });
-    }
-  }, [location.pathname, navigate, permissions]);
-
-  if (permissions.isLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-screen w-full bg-slate-50">
@@ -169,7 +140,7 @@ export default function Layout() {
               {NAVIGATION_GROUPS.map((group) => {
                 const visibleItems = group.items.filter(item => {
                   if (!item.permKey) return true;
-                  return permissions[item.permKey as keyof typeof permissions];
+                  return permissions[item.permKey as keyof UserPermissions];
                 });
 
                 if (visibleItems.length === 0) return null;

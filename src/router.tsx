@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRoute, redirect, Outlet } from '@tanstack/react-router';
+import { createRouter, createRoute, createRootRouteWithContext, redirect, Outlet } from '@tanstack/react-router';
 import { AuthGuard } from './components/auth/AuthGuard';
 import Layout from './components/layout/Layout';
 import LoginScreen from './features/auth/LoginScreen';
@@ -39,7 +39,13 @@ import BugReports from './features/settings/tabs/BugReports';
 import Intelligence from './features/settings/tabs/Intelligence';
 import Changelog from './features/settings/tabs/Changelog';
 
-const rootRoute = createRootRoute({
+import { UserPermissions } from './types';
+
+export interface RouterAuthContext {
+  auth: { isAuthenticated: boolean; permissions?: Partial<UserPermissions> };
+}
+
+const rootRoute = createRootRouteWithContext<RouterAuthContext>()({
   component: () => <Outlet />,
 });
 
@@ -103,18 +109,33 @@ const husbandryRoute = createRoute({
 const dailyLogRoute = createRoute({
   getParentRoute: () => husbandryRoute,
   path: '/daily-log',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.dailyLog) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: DailyLog,
 });
 
 const dailyRoundsRoute = createRoute({
   getParentRoute: () => husbandryRoute,
   path: '/daily-rounds',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.rounds) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: DailyRounds,
 });
 
 const tasksRoute = createRoute({
   getParentRoute: () => husbandryRoute,
   path: '/tasks',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.tasks) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: Tasks,
 });
 
@@ -128,18 +149,33 @@ const feedingScheduleRoute = createRoute({
 const medicalRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/medical',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.medical) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: MedicalRecords,
 });
 
 const medicationsRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/medications',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.viewMedications) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: MarCharts,
 });
 
 const quarantineRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/quarantine',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.viewQuarantine) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: QuarantineRecords,
 });
 
@@ -152,6 +188,11 @@ const logisticsRoute = createRoute({
 const movementsRoute = createRoute({
   getParentRoute: () => logisticsRoute,
   path: '/movements',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.movements) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: Movements,
 });
 
@@ -176,12 +217,22 @@ const rotaRoute = createRoute({
 const timesheetsRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: '/staff-timesheets',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.attendance) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: Timesheets,
 });
 
 const holidaysRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: '/staff-holidays',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.holidayApprover && !context.auth.permissions?.attendance) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: Holidays,
 });
 
@@ -194,12 +245,22 @@ const reportsRoute = createRoute({
 const reportsDashboardRoute = createRoute({
   getParentRoute: () => reportsRoute,
   path: '/reports',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.reports) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: ReportsDashboard,
 });
 
 const complianceRoute = createRoute({
   getParentRoute: () => reportsRoute,
   path: '/compliance',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.missingRecords) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: MissingRecords,
 });
 
@@ -219,24 +280,44 @@ const safetyRoute = createRoute({
 const maintenanceRoute = createRoute({
   getParentRoute: () => safetyRoute,
   path: '/site-maintenance',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.maintenance) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: SiteMaintenance,
 });
 
 const incidentsRoute = createRoute({
   getParentRoute: () => safetyRoute,
   path: '/incidents',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.safety) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: Incidents,
 });
 
 const firstAidRoute = createRoute({
   getParentRoute: () => safetyRoute,
   path: '/first-aid',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.safety) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: FirstAid,
 });
 
 const drillsRoute = createRoute({
   getParentRoute: () => safetyRoute,
   path: '/safety-drills',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.safety) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: SafetyDrills,
 });
 
@@ -244,8 +325,14 @@ const drillsRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/settings',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.permissions?.settings) {
+      throw redirect({ to: '/dashboard' });
+    }
+  },
   component: SettingsLayout,
 });
+// ... (rest of the file)
 
 const settingsIndexRoute = createRoute({
   getParentRoute: () => settingsRoute,
