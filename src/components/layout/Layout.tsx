@@ -10,7 +10,7 @@ import {
   Stethoscope, ArrowRightLeft, Plane, Wrench, AlertTriangle, 
   Cross, ShieldAlert, Clock, Calendar, Users, FileCheck, 
   BarChart2, Settings, HelpCircle, LogOut, Menu, X, ChevronLeft, ChevronRight,
-  Loader2, Accessibility
+  Loader2, Accessibility, Pill
 } from 'lucide-react';
 import { A11yControlPanel } from './A11yControlPanel';
 import { ClockInButton } from '../staff/ClockInButton';
@@ -35,7 +35,9 @@ const NAVIGATION_GROUPS = [
     title: 'Animals',
     items: [
       { name: 'Animals', path: '/animals', icon: ClipboardList, permKey: null },
-      { name: 'Medical', path: '/medical', icon: Stethoscope, permKey: 'view_medical' },
+      { name: 'Clinical Notes', path: '/medical', icon: Stethoscope, permKey: 'view_medical' },
+      { name: 'Medications', path: '/medications', icon: Pill, permKey: 'view_medical' },
+      { name: 'Quarantine', path: '/quarantine', icon: ShieldAlert, permKey: 'view_medical' },
     ]
   },
   {
@@ -92,6 +94,8 @@ export default function Layout() {
     let isAllowed = true;
 
     if (path.startsWith('/medical') && !permissions.view_medical) isAllowed = false;
+    else if (path.startsWith('/medications') && !permissions.view_medical) isAllowed = false;
+    else if (path.startsWith('/quarantine') && !permissions.view_medical) isAllowed = false;
     else if (path.startsWith('/daily-log') && !permissions.view_daily_logs) isAllowed = false;
     else if (path.startsWith('/tasks') && !permissions.view_tasks) isAllowed = false;
     else if (path.startsWith('/daily-rounds') && !permissions.view_daily_rounds) isAllowed = false;

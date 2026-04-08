@@ -8,6 +8,8 @@ import DashboardContainer from './features/dashboard/DashboardContainer';
 import AnimalsList from './features/animals/AnimalsList';
 import AnimalProfile from './features/animals/AnimalProfile';
 import MedicalRecords from './features/medical/MedicalRecords';
+import MarCharts from './features/medical/MarCharts';
+import QuarantineRecords from './features/medical/QuarantineRecords';
 import Movements from './features/logistics/Movements';
 import FlightRecords from './features/logistics/FlightRecords';
 import StaffRota from './features/staff/StaffRota';
@@ -127,6 +129,18 @@ const medicalRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/medical',
   component: MedicalRecords,
+});
+
+const medicationsRoute = createRoute({
+  getParentRoute: () => authRoute,
+  path: '/medications',
+  component: MarCharts,
+});
+
+const quarantineRoute = createRoute({
+  getParentRoute: () => authRoute,
+  path: '/quarantine',
+  component: QuarantineRecords,
 });
 
 // Logistics Layout (Pathless)
@@ -308,6 +322,8 @@ const routeTree = rootRoute.addChildren([
       feedingScheduleRoute,
     ]),
     medicalRoute,
+    medicationsRoute,
+    quarantineRoute,
     logisticsRoute.addChildren([
       movementsRoute,
       flightsRoute,

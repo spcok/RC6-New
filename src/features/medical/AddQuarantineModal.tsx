@@ -40,7 +40,12 @@ export const AddQuarantineModal: React.FC<Props> = ({ isOpen, onClose, onSave, a
       setIsSubmitting(true);
       try {
         const data = schema.parse(value);
-        await onSave(data);
+        const selectedAnimal = animals.find(a => a.id === data.animalId);
+        await onSave({ 
+          ...data, 
+          animalName: selectedAnimal?.name || 'Unknown', 
+          status: 'Active' 
+        });
         form.reset();
         onClose();
       } catch (error) {
