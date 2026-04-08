@@ -115,7 +115,12 @@ export const useMedicalData = (animalId?: string) => {
       const newNote = { id: note.id || crypto.randomUUID(), ...note, isDeleted: false } as ClinicalNote;
       
       queryClient.setQueryData(['medical_records'], [...(previousNotes || []), newNote]);
-      await medicalLogsCollection.insert(newNote);
+      const existingNote = await medicalLogsCollection.findById(newNote.id);
+      if (existingNote) {
+        await medicalLogsCollection.update(newNote.id, newNote);
+      } else {
+        await medicalLogsCollection.insert(newNote);
+      }
       
       return { previousNotes };
     },
@@ -203,7 +208,12 @@ export const useMedicalData = (animalId?: string) => {
       const newChart = { id: chart.id || crypto.randomUUID(), ...chart, isDeleted: false } as MARChart;
       
       queryClient.setQueryData(['mar_charts'], [...(previousCharts || []), newChart]);
-      await marChartsCollection.insert(newChart);
+      const existingChart = await marChartsCollection.findById(newChart.id);
+      if (existingChart) {
+        await marChartsCollection.update(newChart.id, newChart);
+      } else {
+        await marChartsCollection.insert(newChart);
+      }
       
       return { previousCharts };
     },
@@ -242,7 +252,12 @@ export const useMedicalData = (animalId?: string) => {
       const newRecord = { id: record.id || crypto.randomUUID(), ...record, isDeleted: false } as QuarantineRecord;
       
       queryClient.setQueryData(['quarantine_records'], [...(previousRecords || []), newRecord]);
-      await quarantineRecordsCollection.insert(newRecord);
+      const existingRecord = await quarantineRecordsCollection.findById(newRecord.id);
+      if (existingRecord) {
+        await quarantineRecordsCollection.update(newRecord.id, newRecord);
+      } else {
+        await quarantineRecordsCollection.insert(newRecord);
+      }
       
       return { previousRecords };
     },

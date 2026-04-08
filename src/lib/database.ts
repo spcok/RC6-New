@@ -32,17 +32,17 @@ export const createStandardCollection = <T extends { id: string }>(tableName: st
   });
 
   const singleDraftUpdate = async (draft: Partial<T> & { id: string }) => {
-    await collection.update(draft);
+    await collection.update(draft.id, draft);
   };
 
   return {
     insert: collection.insert,
     update: singleDraftUpdate,
     delete: collection.delete,
-    getAll: collection.queryFn,
+    getAll: async () => queryClient.getQueryData<T[]>([tableName]) || [],
     findById: async (id: string) => {
-      const all = await collection.queryFn();
-      return all.find(item => item.id === id);
+      const all = queryClient.getQueryData<T[]>([tableName]) || [];
+      return all.find((item: T) => item.id === id);
     }
   };
 };
@@ -73,17 +73,17 @@ export const dailyLogsCollection = (() => {
   });
 
   const singleDraftUpdate = async (draft: Partial<LogEntry> & { id: string }) => {
-    await collection.update(draft);
+    await collection.update(draft.id, draft);
   };
 
   return {
     insert: collection.insert,
     update: singleDraftUpdate,
     delete: collection.delete,
-    getAll: collection.queryFn,
+    getAll: async () => queryClient.getQueryData<LogEntry[]>(['daily_logs']) || [],
     findById: async (id: string) => {
-      const all = await collection.queryFn();
-      return all.find(item => item.id === id);
+      const all = queryClient.getQueryData<LogEntry[]>(['daily_logs']) || [];
+      return all.find((item: LogEntry) => item.id === id);
     }
   };
 })();

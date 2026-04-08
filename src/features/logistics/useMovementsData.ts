@@ -72,7 +72,12 @@ export const useMovementsData = () => {
       } as InternalMovement;
       
       queryClient.setQueryData(['movements'], [...(previousMovements || []), payload]);
-      await movementsCollection.insert(payload);
+      const existing = await movementsCollection.findById(payload.id);
+      if (existing) {
+          await movementsCollection.update(payload); 
+      } else {
+          await movementsCollection.insert(payload);
+      }
       
       return { previousMovements };
     },
