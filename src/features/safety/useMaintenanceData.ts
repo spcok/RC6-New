@@ -16,12 +16,6 @@ export const useMaintenanceData = () => {
         
         const mappedData: MaintenanceLog[] = data.map((item: Record<string, unknown>) => mapToCamelCase<MaintenanceLog>(item));
 
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await maintenanceCollection.sync(item);
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving maintenance logs from local vault.");

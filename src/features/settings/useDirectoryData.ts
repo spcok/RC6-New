@@ -15,16 +15,10 @@ export const useDirectoryData = () => {
         
         const mappedData = data as Contact[];
         
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await directoryCollection.sync(item);
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving directory from local vault.");
-        return await directoryCollection.getOfflineData();
+        return await directoryCollection.getAll();
       }
     }
   });

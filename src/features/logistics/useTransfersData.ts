@@ -46,15 +46,10 @@ export const useTransfersData = () => {
           isDeleted: item.is_deleted
         }));
         
-        setTimeout(async () => {
-          for (const item of transfers) {
-            await transfersCollection.sync(sanitizePayload(item));
-          }
-        }, 0);
         return transfers;
       } catch {
         console.warn("Network unreachable. Serving transfers from local vault.");
-        return await transfersCollection.getOfflineData();
+        return await transfersCollection.getAll();
       }
     }
   });

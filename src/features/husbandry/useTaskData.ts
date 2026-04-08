@@ -33,16 +33,10 @@ export const useTaskData = () => {
           isDeleted: item.isDeleted ?? false,
         }));
         
-        setTimeout(async () => {
-            for (const item of mappedData) {
-                await tasksCollection.sync(item);
-            }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving tasks from local vault.");
-        return await tasksCollection.getOfflineData();
+        return await tasksCollection.getAll();
       }
     }
   });

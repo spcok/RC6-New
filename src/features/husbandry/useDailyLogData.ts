@@ -33,16 +33,10 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
           isDeleted: item.isDeleted ?? false,
         }));
         
-        setTimeout(async () => {
-            for (const item of mappedData) {
-                await dailyLogsCollection.sync(item);
-            }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving from local vault.");
-        return await dailyLogsCollection.getOfflineData();
+        return await dailyLogsCollection.getAll();
       }
     }
   });

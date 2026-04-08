@@ -18,11 +18,6 @@ export const useMedicalData = (animalId?: string) => {
         
         const mappedData: ClinicalNote[] = data.map((item: Record<string, unknown>) => mapToCamelCase<ClinicalNote>(item));
 
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await medicalLogsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving Medical Records from local vault.");
@@ -41,11 +36,6 @@ export const useMedicalData = (animalId?: string) => {
         
         const mappedData: MARChart[] = data.map((item: Record<string, unknown>) => mapToCamelCase<MARChart>(item));
 
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await marChartsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving MAR Charts from local vault.");
@@ -64,11 +54,6 @@ export const useMedicalData = (animalId?: string) => {
         
         const mappedData: QuarantineRecord[] = data.map((item: Record<string, unknown>) => mapToCamelCase<QuarantineRecord>(item));
 
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await quarantineRecordsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving Quarantine Records from local vault.");

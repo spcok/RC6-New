@@ -16,11 +16,6 @@ export function useFirstAidData() {
         
         const mappedData: FirstAidLog[] = data.map((item: Record<string, unknown>) => mapToCamelCase<FirstAidLog>(item));
         
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await firstAidCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving First Aid logs from local vault.");

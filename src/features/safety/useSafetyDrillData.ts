@@ -12,12 +12,6 @@ export const useSafetyDrillData = () => {
       try {
         const { data, error } = await supabase.from('safety_drills').select('*');
         if (error) throw error;
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of data) {
-            await safetyDrillsCollection.sync(item);
-          }
-        }, 0);
         return data as SafetyDrill[];
       } catch {
         console.warn("Network unreachable. Serving safety drills from local vault.");

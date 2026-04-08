@@ -16,12 +16,6 @@ export const useRotaData = () => {
         
         const mappedData: Shift[] = data.map((item: Record<string, unknown>) => mapToCamelCase<Shift>(item));
 
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await rotaCollection.sync(item);
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving rota from local vault.");

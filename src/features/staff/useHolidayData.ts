@@ -15,12 +15,6 @@ export function useHolidayData() {
         
         const mappedData = data as Holiday[];
         
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await holidaysCollection.sync(item);
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving holidays from local vault.");

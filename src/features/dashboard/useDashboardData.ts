@@ -35,12 +35,6 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await animalsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
@@ -57,12 +51,6 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await dailyLogsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving daily logs from local vault.");
@@ -79,12 +67,6 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         const { data, error } = await supabase.from('tasks').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await tasksCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving tasks from local vault.");

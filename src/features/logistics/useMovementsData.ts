@@ -38,15 +38,10 @@ export const useMovementsData = () => {
           isDeleted: item.is_deleted || false
         }));
         
-        setTimeout(async () => {
-          for (const item of movements) {
-            await movementsCollection.sync(item);
-          }
-        }, 0);
         return movements;
       } catch {
         console.warn("Network unreachable. Serving movements from local vault.");
-        return await movementsCollection.getOfflineData();
+        return await movementsCollection.getAll();
       }
     }
   });

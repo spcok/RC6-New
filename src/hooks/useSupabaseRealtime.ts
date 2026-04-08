@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { queryClient } from '../lib/queryClient';
 
 export const useSupabaseRealtime = () => {
-  const queryClient = useQueryClient();
-
   useEffect(() => {
     const channel = supabase
       .channel('global-db-changes')
@@ -19,9 +17,6 @@ export const useSupabaseRealtime = () => {
           if (table === 'animals') {
             queryClient.invalidateQueries({ queryKey: ['animals'] });
             queryClient.invalidateQueries({ queryKey: ['animal'] });
-          } else if (table === 'daily_logs') {
-            queryClient.invalidateQueries({ queryKey: ['daily_logs'] });
-            queryClient.invalidateQueries({ queryKey: ['daily_logs_today'] });
           } else if (table === 'tasks') {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
           } else if (table === 'clinical_notes') {
@@ -38,10 +33,24 @@ export const useSupabaseRealtime = () => {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'daily_logs' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['daily_logs'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'daily_logs' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['daily_logs'] });
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, []);
 };

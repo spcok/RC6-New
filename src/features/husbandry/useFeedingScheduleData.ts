@@ -4,14 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { LogEntry, LogType } from '../../types';
 import { mapToCamelCase } from '../../lib/dataMapping';
 
-const sanitizePayload = <T extends Record<string, unknown>>(payload: T): T => {
-  const sanitized = { ...payload };
-  Object.keys(sanitized).forEach(key => {
-    if (key.startsWith('$')) delete sanitized[key];
-  });
-  return sanitized;
-};
-
 export function useFeedingScheduleData(date: string) {
   const { data: logs = [], isLoading } = useQuery<LogEntry[]>({
     queryKey: ['dailyLogs'],
@@ -45,17 +37,10 @@ export function useFeedingScheduleData(date: string) {
           isDeleted: item.isDeleted ?? false,
         }));
         
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await dailyLogsCollection.sync(sanitizePayload(item));
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving from local vault.");
-        return await dailyLogsCollection.getOfflineData();
+        return await dailyLogsCollection.getAll();
       }
     }
   });

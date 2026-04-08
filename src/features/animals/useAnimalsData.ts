@@ -31,15 +31,10 @@ export const useAnimalsData = () => {
           isDeleted: item.isDeleted ?? false,
         }));
 
-        setTimeout(async () => {
-            for (const item of mappedData) {
-                await animalsCollection.sync(item);
-            }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
-        return await animalsCollection.getOfflineData();
+        return await animalsCollection.getAll();
       }
     }
   });

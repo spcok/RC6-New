@@ -26,17 +26,10 @@ export function useOrgSettings() {
         const { data, error } = await supabase.from('org_settings').select('*');
         if (error) throw error;
         
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of data) {
-            await orgSettingsCollection.sync(item);
-          }
-        }, 0);
-        
         return data as OrgProfileSettings[];
       } catch {
         console.warn("Network unreachable. Serving from local vault.");
-        return await orgSettingsCollection.getOfflineData();
+        return await orgSettingsCollection.getAll();
       }
     }
   });

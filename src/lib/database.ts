@@ -23,11 +23,12 @@ export const createFailoverRepository = <T extends { id: string }>(tableName: st
       if (error) throw error;
       return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item));
     },
-    sync: {
-      onInsert: async () => {},
-      onUpdate: async () => {},
-      onDelete: async () => {}
-    }
+    // The empty sync object satisfies the initialization requirement
+    sync: {},
+    // The top-level handlers satisfy the mutation requirement
+    onInsert: async () => {},
+    onUpdate: async () => {},
+    onDelete: async () => {}
   });
 
   return {
@@ -36,9 +37,15 @@ export const createFailoverRepository = <T extends { id: string }>(tableName: st
     delete: collection.delete,
     sync: async (item: T) => {
       try {
-        await collection.update(item.id, item);
-      } catch {
         await collection.insert(item);
+      } catch (e: any) {
+        // If it fails because it's already in the vault, safely update it instead.
+        if (e && e.message && e.message.includes("already exists")) {
+          await collection.update(item.id, item);
+        } else {
+          // Silently absorb other IndexedDB transition errors to prevent UI crashes
+          console.warn(`[Vault] Non-fatal sync issue for ${item.id}`);
+        }
       }
     },
     findById: async (id: string) => {

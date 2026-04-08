@@ -24,12 +24,6 @@ export function useTimesheetData() {
         
         const mappedData: Timesheet[] = data.map((item: Record<string, unknown>) => mapToCamelCase<Timesheet>(item));
 
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await timesheetsCollection.sync(item);
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Falling back to 14-day local vault.");

@@ -16,12 +16,6 @@ export const useIncidentData = () => {
         
         const mappedData: Incident[] = data.map((item: Record<string, unknown>) => mapToCamelCase<Incident>(item));
 
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await incidentsCollection.sync(item);
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving incidents from local vault.");

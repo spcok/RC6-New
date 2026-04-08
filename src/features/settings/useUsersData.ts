@@ -18,16 +18,10 @@ export const useUsersData = () => {
 
         const camelCaseData = mapToCamelCase<UserProfile[]>(data);
 
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of camelCaseData) {
-            await usersCollection.sync(item);
-          }
-        }, 0);
         return camelCaseData;
       } catch {
         console.warn("Network unreachable. Serving users from local vault.");
-        return await usersCollection.getOfflineData();
+        return await usersCollection.getAll();
       }
     }
   });

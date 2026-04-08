@@ -15,16 +15,10 @@ export const useZLADocsData = () => {
         
         const mappedData = data as ZLADocument[];
         
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await zlaDocumentsCollection.sync(item);
-          }
-        }, 0);
-        
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving ZLA Docs from local vault.");
-        return await zlaDocumentsCollection.getOfflineData();
+        return await zlaDocumentsCollection.getAll();
       }
     }
   });
