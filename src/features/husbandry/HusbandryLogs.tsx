@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { Plus, Loader2, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Edit2, Trash2, Thermometer } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import AddEntryModal from './AddEntryModal';
 import { Animal, LogType, LogEntry } from '../../types';
@@ -154,6 +154,8 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
               <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
                 {virtualizer.getVirtualItems().map(virtualRow => {
                   const log = filteredLogs[virtualRow.index];
+                  const isSystemLog = log.userInitials === 'SYS';
+                  
                   return (
                     <div
                       key={virtualRow.key}
@@ -165,7 +167,7 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
                         height: `${virtualRow.size}px`,
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
-                      className="px-4 border-b border-slate-100 grid grid-cols-12 gap-4 items-center hover:bg-white transition-colors bg-transparent"
+                      className={`px-4 border-b border-slate-100 grid grid-cols-12 gap-4 items-center transition-colors ${isSystemLog ? 'bg-blue-50/50' : 'bg-transparent hover:bg-white'}`}
                     >
                       <div className="col-span-3 md:col-span-2 text-xs md:text-sm text-slate-700 font-medium">
                         {new Date(log.logDate || log.createdAt || 0).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -179,23 +181,33 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
                         {renderLogValue(log)}
                       </div>
                       <div className="col-span-2 md:col-span-3 flex items-center justify-end gap-3 text-slate-500 font-bold uppercase text-xs">
-                        <span className="hidden md:inline-block">{log.userInitials || '—'}</span>
-                        <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => { setSelectedLog(log); setIsAddModalOpen(true); }} 
-                            className="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Edit Log"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteLog(log.id!)} 
-                            className="text-red-600 hover:text-red-800 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete Log"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        {isSystemLog ? (
+                          <div className="flex items-center gap-2 text-blue-600">
+                            <Thermometer size={14} className="shrink-0" />
+                            <span className="text-[9px] bg-blue-100 px-1.5 py-0.5 rounded-full tracking-tighter whitespace-nowrap">System Auto-Log</span>
+                          </div>
+                        ) : (
+                          <span className="hidden md:inline-block">{log.userInitials || '—'}</span>
+                        )}
+                        
+                        {!isSystemLog && (
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={() => { setSelectedLog(log); setIsAddModalOpen(true); }} 
+                              className="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit Log"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteLog(log.id!)} 
+                              className="text-red-600 hover:text-red-800 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Log"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

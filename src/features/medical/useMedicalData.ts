@@ -21,9 +21,14 @@ export const useMedicalData = (animalId?: string) => {
         setTimeout(async () => {
           for (const item of mappedData) {
             try {
-              await medicalLogsCollection.update(item);
-            } catch {
-              await medicalLogsCollection.insert(item);
+              const existingRecord = await medicalLogsCollection.findById(item.id);
+              if (existingRecord) {
+                await medicalLogsCollection.update(item);
+              } else {
+                await medicalLogsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);
@@ -48,9 +53,14 @@ export const useMedicalData = (animalId?: string) => {
         setTimeout(async () => {
           for (const item of mappedData) {
             try {
-              await marChartsCollection.update(item);
-            } catch {
-              await marChartsCollection.insert(item);
+              const existingRecord = await marChartsCollection.findById(item.id);
+              if (existingRecord) {
+                await marChartsCollection.update(item);
+              } else {
+                await marChartsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);
@@ -75,9 +85,14 @@ export const useMedicalData = (animalId?: string) => {
         setTimeout(async () => {
           for (const item of mappedData) {
             try {
-              await quarantineRecordsCollection.update(item);
-            } catch {
-              await quarantineRecordsCollection.insert(item);
+              const existingRecord = await quarantineRecordsCollection.findById(item.id);
+              if (existingRecord) {
+                await quarantineRecordsCollection.update(item);
+              } else {
+                await quarantineRecordsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);

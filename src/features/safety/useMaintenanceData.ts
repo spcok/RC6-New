@@ -19,9 +19,14 @@ export const useMaintenanceData = () => {
         setTimeout(async () => {
           for (const item of mappedData) {
             try {
-              await maintenanceCollection.update(item);
-            } catch {
-              await maintenanceCollection.insert(item);
+              const existingRecord = await maintenanceCollection.findById(item.id);
+              if (existingRecord) {
+                await maintenanceCollection.update(item);
+              } else {
+                await maintenanceCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);

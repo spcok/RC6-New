@@ -12,7 +12,21 @@ export const useSafetyDrillData = () => {
       try {
         const { data, error } = await supabase.from('safety_drills').select('*');
         if (error) throw error;
-        data.forEach(item => safetyDrillsCollection.update(item.id, () => item as SafetyDrill).catch(() => safetyDrillsCollection.insert(item as SafetyDrill)));
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of data) {
+            try {
+              const existingRecord = await safetyDrillsCollection.findById(item.id);
+              if (existingRecord) {
+                await safetyDrillsCollection.update(item);
+              } else {
+                await safetyDrillsCollection.insert(item as SafetyDrill);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
+          }
+        }, 0);
         return data as SafetyDrill[];
       } catch {
         console.warn("Network unreachable. Serving safety drills from local vault.");

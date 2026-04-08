@@ -42,13 +42,21 @@ export function useMissingRecordsData() {
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
-        for (const item of mappedData) {
-          try {
-            await animalsCollection.update(item);
-          } catch {
-            await animalsCollection.insert(item);
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const existingRecord = await animalsCollection.findById(item.id);
+              if (existingRecord) {
+                await animalsCollection.update(item);
+              } else {
+                await animalsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
@@ -64,13 +72,21 @@ export function useMissingRecordsData() {
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
-        for (const item of mappedData) {
-          try {
-            await dailyLogsCollection.update(item);
-          } catch {
-            await dailyLogsCollection.insert(item as unknown as Record<string, unknown>);
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const existingRecord = await dailyLogsCollection.findById(item.id);
+              if (existingRecord) {
+                await dailyLogsCollection.update(item);
+              } else {
+                await dailyLogsCollection.insert(item as unknown as Record<string, unknown>);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving daily logs from local vault.");
@@ -86,13 +102,21 @@ export function useMissingRecordsData() {
         const { data, error } = await supabase.from('medical_logs').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<ClinicalNote>(data as Record<string, unknown>[]) as ClinicalNote[];
-        for (const item of mappedData) {
-          try {
-            await medicalLogsCollection.update(item);
-          } catch {
-            await medicalLogsCollection.insert(item);
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const existingRecord = await medicalLogsCollection.findById(item.id);
+              if (existingRecord) {
+                await medicalLogsCollection.update(item);
+              } else {
+                await medicalLogsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving medical logs from local vault.");

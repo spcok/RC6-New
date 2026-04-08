@@ -118,8 +118,9 @@ export function useDailyRoundData(viewDate: string) {
                 completedAt: new Date().toISOString()
             };
 
-            if (currentRound) {
-                await dailyRoundsCollection.update({ ...currentRound, ...roundData });
+            const existingRecord = await dailyRoundsCollection.findById(roundId);
+            if (existingRecord) {
+                await dailyRoundsCollection.update({ ...existingRecord, ...roundData });
             } else {
                 await dailyRoundsCollection.insert(roundData as DailyRound);
             }

@@ -27,9 +27,14 @@ export function useTimesheetData() {
         setTimeout(async () => {
           for (const item of mappedData) {
             try {
-              await timesheetsCollection.update(item);
-            } catch {
-              await timesheetsCollection.insert(item);
+              const existingRecord = await timesheetsCollection.findById(item.id);
+              if (existingRecord) {
+                await timesheetsCollection.update(item);
+              } else {
+                await timesheetsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);

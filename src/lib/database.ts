@@ -9,6 +9,7 @@ export interface TanStackCollection<T> {
   update: (draft: Partial<T> & { id: string }) => Promise<void>;
   delete: (id: string) => Promise<void>;
   getAll: () => Promise<T[]>;
+  findById: (id: string) => Promise<T | undefined>;
 }
 
 // --- COLLECTION FACTORY ---
@@ -38,7 +39,11 @@ export const createStandardCollection = <T extends { id: string }>(tableName: st
     insert: collection.insert,
     update: singleDraftUpdate,
     delete: collection.delete,
-    getAll: collection.queryFn
+    getAll: collection.queryFn,
+    findById: async (id: string) => {
+      const all = await collection.queryFn();
+      return all.find(item => item.id === id);
+    }
   };
 };
 
@@ -75,7 +80,11 @@ export const dailyLogsCollection = (() => {
     insert: collection.insert,
     update: singleDraftUpdate,
     delete: collection.delete,
-    getAll: collection.queryFn
+    getAll: collection.queryFn,
+    findById: async (id: string) => {
+      const all = await collection.queryFn();
+      return all.find(item => item.id === id);
+    }
   };
 })();
 

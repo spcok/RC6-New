@@ -19,9 +19,14 @@ export const useIncidentData = () => {
         setTimeout(async () => {
           for (const item of mappedData) {
             try {
-              await incidentsCollection.update(item);
-            } catch {
-              await incidentsCollection.insert(item);
+              const existingRecord = await incidentsCollection.findById(item.id);
+              if (existingRecord) {
+                await incidentsCollection.update(item);
+              } else {
+                await incidentsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);

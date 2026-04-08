@@ -19,9 +19,14 @@ export const useRotaData = () => {
         setTimeout(async () => {
           for (const item of mappedData) {
             try {
-              await rotaCollection.update(item);
-            } catch {
-              await rotaCollection.insert(item);
+              const existingRecord = await rotaCollection.findById(item.id);
+              if (existingRecord) {
+                await rotaCollection.update(item);
+              } else {
+                await rotaCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);

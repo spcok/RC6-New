@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { dailyLogsCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { LogEntry, LogType } from '../../types';
+import { mapToCamelCase } from '../../lib/dataMapping';
 
 const sanitizePayload = <T extends Record<string, unknown>>(payload: T): T => {
   const sanitized = { ...payload };
@@ -10,28 +11,6 @@ const sanitizePayload = <T extends Record<string, unknown>>(payload: T): T => {
   });
   return sanitized;
 };
-
-interface SupabaseLogEntry {
-  id: string;
-  animal_id: string | null;
-  log_type: string | null;
-  log_date: string | null;
-  value: string | null;
-  notes: string | null;
-  user_initials: string | null;
-  weight_grams: number | null;
-  weight: number | null;
-  weight_unit: string | null;
-  health_record_type: string | null;
-  basking_temp_c: number | null;
-  cool_temp_c: number | null;
-  temperature_c: number | null;
-  created_at: string;
-  created_by: string | null;
-  integrity_seal: string | null;
-  updated_at: string;
-  is_deleted: boolean;
-}
 
 export function useFeedingScheduleData(date: string) {
   const { data: logs = [], isLoading } = useQuery<LogEntry[]>({
@@ -66,13 +45,22 @@ export function useFeedingScheduleData(date: string) {
           isDeleted: item.isDeleted ?? false,
         }));
         
-        for (const item of mappedData) {
-          try {
-            await dailyLogsCollection.update(sanitizePayload(item));
-          } catch {
-            await dailyLogsCollection.insert(sanitizePayload(item));
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const sanitizedItem = sanitizePayload(item);
+              const existingRecord = await dailyLogsCollection.findById(sanitizedItem.id);
+              if (existingRecord) {
+                await dailyLogsCollection.update(sanitizedItem);
+              } else {
+                await dailyLogsCollection.insert(sanitizedItem);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         
         return mappedData;
       } catch {

@@ -1,75 +1,25 @@
-import { useEffect, useState, useRef } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { Animal, LogEntry, LogType, AnimalCategory } from '../../../types';
-import { getUKLocalDate } from '../../../services/temporalService';
-import { getMaidstoneDailyWeather } from '../../../services/weatherService';
+import { useQuery } from '@tanstack/react-query';
+import { getFullWeather, FullWeatherData } from '../../../services/weatherService';
 
-export const useWeatherSync = (
-  animals: Animal[],
-  getTodayLog: (animalId: string, type: LogType) => LogEntry | undefined,
-  addLogEntry: (entry: LogEntry) => Promise<void>,
-  viewDate: string,
-  isProcessing: React.MutableRefObject<Set<string>>
-) => {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const isMounted = useRef(false);
-  const successfullySynced = useRef<Set<string>>(new Set());
+/**
+ * useWeatherSync
+ * 
+ * Refactored to be a read-only data fetcher.
+ * ZLA environmental temperature logging has been offloaded to a backend Supabase Edge Function (pg_cron).
+ * This hook now serves as a passive provider of live weather data for the UI.
+ */
+export const useWeatherSync = () => {
+  const { data, isLoading, error } = useQuery<FullWeatherData>({
+    queryKey: ['weather', 'Maidstone'],
+    queryFn: () => getFullWeather('Maidstone, Kent, UK'),
+    staleTime: 1000 * 60 * 15, // Cache for 15 minutes
+    refetchInterval: 1000 * 60 * 30, // Refresh every 30 minutes
+  });
 
-  useEffect(() => {
-    isMounted.current = true;
-    const syncWeather = async () => {
-      const today = getUKLocalDate();
-      if (viewDate !== today) return;
-      if (animals.length === 0) return;
-
-      const birdsToSync = animals.filter(
-        animal =>
-          (animal.category === AnimalCategory.OWLS || animal.category === AnimalCategory.RAPTORS) &&
-          !getTodayLog(animal.id, LogType.TEMPERATURE) &&
-          !isProcessing.current.has(animal.id) &&
-          !successfullySynced.current.has(animal.id)
-      );
-
-      if (birdsToSync.length === 0) return;
-
-      if (!isMounted.current) return;
-      setIsSyncing(true);
-      try {
-        const weather = await getMaidstoneDailyWeather();
-        
-        for (const bird of birdsToSync) {
-          if (isProcessing.current.has(bird.id) || successfullySynced.current.has(bird.id)) continue;
-          isProcessing.current.add(bird.id);
-          try {
-            await addLogEntry({
-              id: uuidv4(),
-              animal_id: bird.id,
-              log_type: LogType.TEMPERATURE,
-              log_date: viewDate,
-              value: `${Math.round(weather.currentTemp)}°C`,
-              notes: weather.description
-            });
-            successfullySynced.current.add(bird.id);
-          } catch (error) {
-            console.error('Fetch failed', error);
-            isProcessing.current.delete(bird.id);
-          }
-          // Note: We DO NOT delete from isProcessing.current on success to prevent re-syncing in same session
-        }
-      } catch (error) {
-        console.error('Failed to auto-sync weather for birds:', error);
-        // If weather fetch fails, unlock all birds we intended to sync
-        birdsToSync.forEach(bird => isProcessing.current.delete(bird.id));
-      } finally {
-        if (isMounted.current) setIsSyncing(false);
-      }
-    };
-
-    syncWeather();
-    return () => {
-      isMounted.current = false;
-    };
-  }, [animals, getTodayLog, addLogEntry, viewDate, isProcessing]);
-
-  return { isSyncing };
+  return {
+    data,
+    isLoading,
+    error: error ? 'STATION OFFLINE' : null,
+    isSyncing: isLoading // Maintained for backward compatibility with DailyLog.tsx
+  };
 };

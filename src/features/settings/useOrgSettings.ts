@@ -26,8 +26,21 @@ export function useOrgSettings() {
         const { data, error } = await supabase.from('org_settings').select('*');
         if (error) throw error;
         
-        // Refresh local vault
-        data.forEach(item => orgSettingsCollection.update(item.id, () => item as OrgProfileSettings).catch(() => orgSettingsCollection.insert(item as OrgProfileSettings)));
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of data) {
+            try {
+              const existingRecord = await orgSettingsCollection.findById(item.id);
+              if (existingRecord) {
+                await orgSettingsCollection.update(item);
+              } else {
+                await orgSettingsCollection.insert(item as OrgProfileSettings);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
+          }
+        }, 0);
         
         return data as OrgProfileSettings[];
       } catch {

@@ -16,13 +16,20 @@ export function useFirstAidData() {
         
         const mappedData: FirstAidLog[] = data.map((item: Record<string, unknown>) => mapToCamelCase<FirstAidLog>(item));
         
-        for (const item of mappedData) {
-          try {
-            await firstAidCollection.update(item);
-          } catch {
-            await firstAidCollection.insert(item);
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const existingRecord = await firstAidCollection.findById(item.id);
+              if (existingRecord) {
+                await firstAidCollection.update(item);
+              } else {
+                await firstAidCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving First Aid logs from local vault.");

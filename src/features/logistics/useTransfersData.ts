@@ -49,9 +49,15 @@ export const useTransfersData = () => {
         setTimeout(async () => {
           for (const item of transfers) {
             try {
-              await transfersCollection.update(sanitizePayload(item));
-            } catch {
-              await transfersCollection.insert(sanitizePayload(item));
+              const sanitizedItem = sanitizePayload(item);
+              const existingRecord = await transfersCollection.findById(sanitizedItem.id);
+              if (existingRecord) {
+                await transfersCollection.update(sanitizedItem);
+              } else {
+                await transfersCollection.insert(sanitizedItem);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);

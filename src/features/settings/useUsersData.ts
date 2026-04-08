@@ -18,16 +18,23 @@ export const useUsersData = () => {
 
         const camelCaseData = mapToCamelCase<UserProfile[]>(data);
 
-        // Optimistically sync to the local vault
-        for (const item of camelCaseData) {
-          try {
-            await usersCollection.update(item);
-          } catch {
-            await usersCollection.insert(item);
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of camelCaseData) {
+            try {
+              const existingRecord = await usersCollection.findById(item.id);
+              if (existingRecord) {
+                await usersCollection.update(item);
+              } else {
+                await usersCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return camelCaseData;
-      } catch (err) {
+      } catch {
         console.warn("Network unreachable. Serving users from local vault.");
         const localData = await usersCollection.getAll();
         return localData as unknown as UserProfile[];

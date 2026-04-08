@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useTransition } from 'react';
-import { getFullWeather, FullWeatherData, WeatherDaily, WeatherHourly } from '../../services/weatherService';
+import { WeatherDaily, WeatherHourly } from '../../services/weatherService';
+import { useWeatherSync } from '../husbandry/hooks/useWeatherSync';
 import { analyzeFlightWeather } from '../../services/geminiService';
-import { useOrgSettings } from '../settings/useOrgSettings';
 import { 
     CloudSun, CloudRain, Sun, 
     Cloud, CloudLightning, Snowflake, Navigation, 
@@ -9,12 +9,20 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
+const WeatherIcon = ({ code, size = 24, className = "" }: { code: number, size?: number, className?: string }) => {
+   if (code === 0) return <Sun size={size} className={`text-yellow-400 ${className}`} />;
+   if (code <= 3) return <CloudSun size={size} className={`text-slate-400 ${className}`} />;
+   if (code <= 48) return <CloudFog size={size} className={`text-slate-400 ${className}`} />;
+   if (code <= 67) return <CloudRain size={size} className={`text-blue-400 ${className}`} />;
+   if (code <= 77) return <Snowflake size={size} className={`text-cyan-400 ${className}`} />;
+   if (code <= 82) return <CloudRain size={size} className={`text-blue-500 ${className}`} />;
+   if (code <= 99) return <CloudLightning size={size} className={`text-purple-500 ${className}`} />;
+   return <Cloud size={size} className={`text-slate-400 ${className}`} />;
+};
+
 const WeatherView: React.FC = () => {
-  const { settings } = useOrgSettings();
-  const [data, setData] = useState<FullWeatherData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data, isLoading, error } = useWeatherSync();
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
   
   // AI Advisor State
   const [isPendingAi, startTransitionAi] = useTransition();
@@ -33,45 +41,10 @@ const WeatherView: React.FC = () => {
     };
   }, []);
 
-  // 1. Fetch Data with Cleanup and Error Handling
-  useEffect(() => {
-    let isMounted = true;
-    
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const weather = await getFullWeather('Maidstone, Kent, UK');
-        
-        if (isMounted) {
-          if (weather) {
-            setData(weather);
-            if (weather.daily && weather.daily.length > 0) {
-              // Safely access the first daily date
-              const firstDay = weather.daily[0];
-              if (typeof firstDay.date === 'string') {
-                setSelectedDate(firstDay.date);
-              }
-            }
-          } else {
-            setError('STATION OFFLINE');
-          }
-        }
-      } catch (err) {
-        console.error('Weather fetch error:', err);
-        if (isMounted) {
-          setError('STATION OFFLINE');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-    loadData();
-
-    return () => { isMounted = false; };
-  }, [settings?.address]);
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date);
+    setAiAnalysis(null);
+  };
 
   const handleGenerateAiAnalysis = () => {
       if (!navigator.onLine) {
@@ -99,8 +72,8 @@ const WeatherView: React.FC = () => {
       });
   };
 
-  useEffect(() => { setAiAnalysis(null); }, [selectedDate]);
-
+  // AI Analysis is cleared via handleDateSelect
+  
   if (isLoading) {
     return (
         <div className="flex flex-col items-center justify-center h-96 text-slate-400 gap-3">
@@ -122,18 +95,8 @@ const WeatherView: React.FC = () => {
   }
 
   const { current, daily, hourly } = data;
-  const selectedHourly = hourly.filter((h: WeatherHourly) => String(h.time).startsWith(selectedDate));
-
-  const WeatherIcon = ({ code, size = 24, className = "" }: { code: number, size?: number, className?: string }) => {
-     if (code === 0) return <Sun size={size} className={`text-yellow-400 ${className}`} />;
-     if (code <= 3) return <CloudSun size={size} className={`text-slate-400 ${className}`} />;
-     if (code <= 48) return <CloudFog size={size} className={`text-slate-400 ${className}`} />;
-     if (code <= 67) return <CloudRain size={size} className={`text-blue-400 ${className}`} />;
-     if (code <= 77) return <Snowflake size={size} className={`text-cyan-400 ${className}`} />;
-     if (code <= 82) return <CloudRain size={size} className={`text-blue-500 ${className}`} />;
-     if (code <= 99) return <CloudLightning size={size} className={`text-purple-500 ${className}`} />;
-     return <Cloud size={size} className={`text-slate-400 ${className}`} />;
-  };
+  const effectiveSelectedDate = selectedDate || (daily?.[0]?.date as string) || '';
+  const selectedHourly = hourly.filter((h: WeatherHourly) => String(h.time).startsWith(effectiveSelectedDate));
 
   // Safely cast current values for logic
   const temp = typeof current.temperature === 'number' ? current.temperature : 0;
@@ -257,11 +220,11 @@ const WeatherView: React.FC = () => {
               <div className="bg-slate-100/50 p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-nowrap gap-2 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200">
                   {daily.slice(0, 7).map((day: WeatherDaily) => {
                       const dateObj = new Date(String(day.date));
-                      const isSelected = day.date === selectedDate;
+                      const isSelected = day.date === effectiveSelectedDate;
                       return (
                           <button 
                             key={String(day.date)}
-                            onClick={() => setSelectedDate(String(day.date))}
+                            onClick={() => handleDateSelect(String(day.date))}
                             className={`flex-none min-w-[80px] sm:min-w-[100px] px-4 py-4 rounded-xl flex flex-col items-center transition-all ${
                                 isSelected ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'
                             }`}
@@ -286,7 +249,7 @@ const WeatherView: React.FC = () => {
                     <div className="p-6 border-b border-slate-100 flex flex-col items-start gap-2">
                         <h2 className="text-xl font-medium text-slate-800">Hourly Forecast</h2>
                         <span className="px-3 py-1 bg-slate-100 border border-slate-200 rounded-full text-xs font-medium text-slate-700 shadow-sm">
-                            {selectedDate ? new Date(selectedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '---'}
+                            {effectiveSelectedDate ? new Date(effectiveSelectedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '---'}
                         </span>
                     </div>
                     

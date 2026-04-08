@@ -34,7 +34,7 @@ const DailyLog: React.FC = () => {
   const isProcessing = useRef<Set<string>>(new Set());
   
   const { animals, getTodayLog, addLogEntry, isLoading } = useDailyLogData(viewDate, activeCategory);
-  const { isSyncing } = useWeatherSync(animals, getTodayLog, addLogEntry, viewDate, isProcessing);
+  const { isSyncing } = useWeatherSync();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);

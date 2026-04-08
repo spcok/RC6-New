@@ -33,13 +33,21 @@ export const useTaskData = () => {
           isDeleted: item.isDeleted ?? false,
         }));
         
-        for (const item of mappedData) {
-          try {
-            await tasksCollection.update(sanitizePayload(item) as Partial<Task> & { id: string; });
-          } catch {
-            await tasksCollection.insert(sanitizePayload(item) as Task);
-          }
-        }
+        setTimeout(async () => {
+            for (const item of mappedData) {
+                try {
+                    // Safe fallback to check existence before inserting
+                    const existingRecord = await tasksCollection.findById(item.id);
+                    if (existingRecord) {
+                        await tasksCollection.update(item.id, item);
+                    } else {
+                        await tasksCollection.insert(item);
+                    }
+                } catch (e) {
+                    console.warn(`[Vault Sync Warning] Failed to sync record ${item.id}:`, e);
+                }
+            }
+        }, 0);
         
         return mappedData;
       } catch {

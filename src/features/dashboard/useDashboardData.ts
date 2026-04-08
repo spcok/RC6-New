@@ -35,13 +35,21 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
-        for (const item of mappedData) {
-          try {
-            await animalsCollection.update(item);
-          } catch {
-            await animalsCollection.insert(item);
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const existingRecord = await animalsCollection.findById(item.id);
+              if (existingRecord) {
+                await animalsCollection.update(item);
+              } else {
+                await animalsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
@@ -58,13 +66,21 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
-        for (const item of mappedData) {
-          try {
-            await dailyLogsCollection.update(item);
-          } catch {
-            await dailyLogsCollection.insert(item);
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const existingRecord = await dailyLogsCollection.findById(item.id);
+              if (existingRecord) {
+                await dailyLogsCollection.update(item);
+              } else {
+                await dailyLogsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving daily logs from local vault.");
@@ -81,13 +97,21 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         const { data, error } = await supabase.from('tasks').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
-        for (const item of mappedData) {
-          try {
-            await tasksCollection.update(item);
-          } catch {
-            await tasksCollection.insert(item);
+        // Refresh local vault (Upsert Pattern)
+        setTimeout(async () => {
+          for (const item of mappedData) {
+            try {
+              const existingRecord = await tasksCollection.findById(item.id);
+              if (existingRecord) {
+                await tasksCollection.update(item);
+              } else {
+                await tasksCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
+            }
           }
-        }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving tasks from local vault.");

@@ -31,13 +31,21 @@ export const useAnimalsData = () => {
           isDeleted: item.isDeleted ?? false,
         }));
 
-        for (const item of mappedData) {
-          try {
-            await animalsCollection.update(item);
-          } catch {
-            await animalsCollection.insert(item);
-          }
-        }
+        setTimeout(async () => {
+            for (const item of mappedData) {
+                try {
+                    // Safe fallback to check existence before inserting
+                    const existingRecord = await animalsCollection.findById(item.id);
+                    if (existingRecord) {
+                        await animalsCollection.update(item.id, item);
+                    } else {
+                        await animalsCollection.insert(item);
+                    }
+                } catch (e) {
+                    console.warn(`[Vault Sync Warning] Failed to sync record ${item.id}:`, e);
+                }
+            }
+        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");

@@ -33,14 +33,21 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
           isDeleted: item.isDeleted ?? false,
         }));
         
-        // Refresh local vault
-        for (const item of mappedData) {
-          try {
-            await dailyLogsCollection.update(item);
-          } catch {
-            await dailyLogsCollection.insert(item);
-          }
-        }
+        setTimeout(async () => {
+            for (const item of mappedData) {
+                try {
+                    // Safe fallback to check existence before inserting
+                    const existingRecord = await dailyLogsCollection.findById(item.id);
+                    if (existingRecord) {
+                        await dailyLogsCollection.update(item.id, item);
+                    } else {
+                        await dailyLogsCollection.insert(item);
+                    }
+                } catch (e) {
+                    console.warn(`[Vault Sync Warning] Failed to sync record ${item.id}:`, e);
+                }
+            }
+        }, 0);
         
         return mappedData;
       } catch {
@@ -72,7 +79,13 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
         isDeleted: false,
         ...entry
       } as LogEntry;
-      await dailyLogsCollection.insert(newEntry);
+      
+      const existing = await dailyLogsCollection.findById(newEntry.id);
+      if (existing) {
+        await dailyLogsCollection.update(newEntry.id, newEntry);
+      } else {
+        await dailyLogsCollection.insert(newEntry);
+      }
       return { newEntry };
     },
     mutationFn: async (entry: Partial<LogEntry>) => {
@@ -115,9 +128,12 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
   const updateLogEntryMutation = useMutation({
     onMutate: async (entry: Partial<LogEntry>) => {
       if (!entry.id) return;
-      const existing = logs.find(l => l.id === entry.id);
+      
+      const existing = await dailyLogsCollection.findById(entry.id);
       if (existing) {
-        await dailyLogsCollection.update({ ...existing, ...entry } as LogEntry & { id: string });
+        await dailyLogsCollection.update(entry.id, { ...existing, ...entry });
+      } else {
+        await dailyLogsCollection.insert({ ...existing, ...entry } as LogEntry);
       }
       return { entry };
     },

@@ -10,28 +10,29 @@ export const toCamelCase = (str: string): string => {
 };
 
 // Deep mapping function
-export const mapToCamelCase = <T>(obj: any): T => {
+export const mapToCamelCase = <T>(obj: unknown): T => {
   // 1. Bail out early for null, undefined, or primitives
   if (obj === null || typeof obj !== 'object') {
-    return obj;
+    return obj as T;
   }
 
   // 2. Bail out for Date objects (they are typeof 'object' but shouldn't be mapped)
   if (obj instanceof Date) {
-    return obj as any;
+    return obj as unknown as T;
   }
 
   // 3. CORRECT ARRAY HANDLING: Map over arrays and return a new Array
   if (Array.isArray(obj)) {
-    return obj.map((item) => mapToCamelCase(item)) as any;
+    return obj.map((item) => mapToCamelCase(item)) as unknown as T;
   }
 
   // 4. Object handling: Create a new object with camelCase keys
-  const camelObj: Record<string, any> = {};
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+  const camelObj: Record<string, unknown> = {};
+  const record = obj as Record<string, unknown>;
+  for (const key in record) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
       const camelKey = toCamelCase(key);
-      camelObj[camelKey] = mapToCamelCase(obj[key]);
+      camelObj[camelKey] = mapToCamelCase(record[key]);
     }
   }
 

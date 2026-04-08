@@ -41,9 +41,14 @@ export const useMovementsData = () => {
         setTimeout(async () => {
           for (const item of movements) {
             try {
-              await movementsCollection.update(item);
-            } catch {
-              await movementsCollection.insert(item);
+              const existingRecord = await movementsCollection.findById(item.id);
+              if (existingRecord) {
+                await movementsCollection.update(item);
+              } else {
+                await movementsCollection.insert(item);
+              }
+            } catch (e) {
+              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
             }
           }
         }, 0);
