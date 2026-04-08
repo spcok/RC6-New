@@ -40,22 +40,13 @@ export const useMovementsData = () => {
         
         setTimeout(async () => {
           for (const item of movements) {
-            try {
-              const existingRecord = await movementsCollection.findById(item.id);
-              if (existingRecord) {
-                await movementsCollection.update(item);
-              } else {
-                await movementsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await movementsCollection.sync(item);
           }
         }, 0);
         return movements;
       } catch {
         console.warn("Network unreachable. Serving movements from local vault.");
-        return await movementsCollection.getAll();
+        return await movementsCollection.getOfflineData();
       }
     }
   });
@@ -72,12 +63,7 @@ export const useMovementsData = () => {
       } as InternalMovement;
       
       queryClient.setQueryData(['movements'], [...(previousMovements || []), payload]);
-      const existing = await movementsCollection.findById(payload.id);
-      if (existing) {
-          await movementsCollection.update(payload); 
-      } else {
-          await movementsCollection.insert(payload);
-      }
+      await movementsCollection.sync(payload);
       
       return { previousMovements };
     },

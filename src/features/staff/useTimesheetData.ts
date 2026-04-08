@@ -26,16 +26,7 @@ export function useTimesheetData() {
 
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await timesheetsCollection.findById(item.id);
-              if (existingRecord) {
-                await timesheetsCollection.update(item);
-              } else {
-                await timesheetsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await timesheetsCollection.sync(item);
           }
         }, 0);
         
@@ -63,7 +54,7 @@ export function useTimesheetData() {
       };
       
       queryClient.setQueryData(['timesheets'], [...(previousTimesheets || []), newShift]);
-      await timesheetsCollection.insert(newShift);
+      await timesheetsCollection.sync(newShift);
       
       return { previousTimesheets };
     },
@@ -97,11 +88,10 @@ export function useTimesheetData() {
         old.map(t => t.id === timesheetId ? { ...t, clockOut: new Date().toISOString(), status: 'Completed' as const } : t)
       );
       
-      const existing = timesheets.find(t => t.id === timesheetId);
-      if (existing) {
-        const updatedShift = { ...existing, clockOut: new Date().toISOString(), status: 'Completed' as const };
-        await timesheetsCollection.update(timesheetId, () => updatedShift as Timesheet);
-      }
+      await timesheetsCollection.update(timesheetId, { 
+        clockOut: new Date().toISOString(), 
+        status: 'Completed' 
+      });
       
       return { previousTimesheets };
     },
@@ -124,7 +114,7 @@ export function useTimesheetData() {
       const payload: Timesheet = sanitizePayload({ ...timesheet, id: crypto.randomUUID(), isDeleted: false } as Timesheet) as Timesheet;
       
       queryClient.setQueryData(['timesheets'], [...(previousTimesheets || []), payload]);
-      await timesheetsCollection.insert(payload);
+      await timesheetsCollection.sync(payload);
       
       return { previousTimesheets };
     },
@@ -150,11 +140,7 @@ export function useTimesheetData() {
         old.map(t => t.id === id ? { ...t, isDeleted: true } : t)
       );
       
-      const existing = timesheets.find(t => t.id === id);
-      if (existing) {
-        const deletedShift: Timesheet = { ...existing, isDeleted: true };
-        await timesheetsCollection.update(id, () => deletedShift);
-      }
+      await timesheetsCollection.update(id, { isDeleted: true });
       
       return { previousTimesheets };
     },

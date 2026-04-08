@@ -1,116 +1,82 @@
 import { createCollection as baseCreateCollection } from '@tanstack/react-db';
 import { queryClient } from './queryClient';
 import { supabase } from './supabase';
-import { LogEntry, Animal, Timesheet, Task, ClinicalNote } from '../types';
+import { LogEntry, Animal, Timesheet, Task, ClinicalNote, DailyRound } from '../types';
 import { mapToCamelCase } from './dataMapping';
 
-export interface TanStackCollection<T> {
-  insert: (item: T) => Promise<void>;
-  update: (draft: Partial<T> & { id: string }) => Promise<void>;
-  delete: (id: string) => Promise<void>;
+export interface FailoverRepository<T> {
+  sync: (item: T) => Promise<void>;
   getAll: () => Promise<T[]>;
   findById: (id: string) => Promise<T | undefined>;
+  insert: (item: T) => Promise<void>;
+  update: (id: string, item: Partial<T>) => Promise<void>;
+  delete: (id: string) => Promise<void>;
 }
 
-// --- COLLECTION FACTORY ---
-export const createStandardCollection = <T extends { id: string }>(tableName: string): TanStackCollection<T> => {
+export const createFailoverRepository = <T extends { id: string }>(tableName: string): FailoverRepository<T> => {
   const collection = baseCreateCollection<T, string>({
     queryKey: [tableName],
     queryClient,
-    getKey: (item: T) => item.id,
+    getKey: (item) => item.id,
     queryFn: async () => {
       const { data, error } = await supabase.from(tableName).select('*').eq('is_deleted', false).limit(5000);
       if (error) throw error;
-      return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item)) || [];
+      return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item));
     },
-    sync: {},
-    // ARCHITECTURAL FIX: Dummy handlers satisfy the library's local insert validation 
-    // without triggering rogue network requests. TanStack Query still handles the network.
-    onInsert: async () => { return; },
-    onUpdate: async () => { return; },
-    onDelete: async () => { return; }
+    sync: {
+      onInsert: async () => {},
+      onUpdate: async () => {},
+      onDelete: async () => {}
+    }
   });
-
-  const singleDraftUpdate = async (draft: Partial<T> & { id: string }) => {
-    await collection.update(draft.id, draft);
-  };
 
   return {
     insert: collection.insert,
-    update: singleDraftUpdate,
+    update: collection.update,
     delete: collection.delete,
-    getAll: async () => queryClient.getQueryData<T[]>([tableName]) || [],
+    sync: async (item: T) => {
+      try {
+        await collection.update(item.id, item);
+      } catch {
+        await collection.insert(item);
+      }
+    },
     findById: async (id: string) => {
       const all = queryClient.getQueryData<T[]>([tableName]) || [];
-      return all.find((item: T) => item.id === id);
-    }
+      return all.find(i => i.id === id);
+    },
+    getAll: async () => queryClient.getQueryData<T[]>([tableName]) || []
   };
 };
 
-// 1. Animals Collection
-export const animalsCollection = createStandardCollection<Animal>('animals');
+// --- EXPORTED REPOSITORIES ---
 
-// 2. Daily Logs Collection
-export const dailyLogsCollection = (() => {
-  const collection = baseCreateCollection<LogEntry, string>({
-    queryKey: ['daily_logs'],
-    queryClient,
-    getKey: (item: LogEntry) => item.id!,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .eq('is_deleted', false)
-        .limit(5000); 
-      if (error) throw error;
-      return (data as Record<string, unknown>[]).map(item => mapToCamelCase<LogEntry>(item)) || [];
-    },
-    sync: {},
-    // ARCHITECTURAL FIX: Dummy handlers
-    onInsert: async () => { return; },
-    onUpdate: async () => { return; },
-    onDelete: async () => { return; }
-  });
+// 1. Core Modules
+export const animalsCollection = createFailoverRepository<Animal>('animals');
+export const dailyLogsCollection = createFailoverRepository<LogEntry>('daily_logs');
+export const dailyRoundsCollection = createFailoverRepository<DailyRound>('daily_rounds');
+export const tasksCollection = createFailoverRepository<Task>('tasks');
 
-  const singleDraftUpdate = async (draft: Partial<LogEntry> & { id: string }) => {
-    await collection.update(draft.id, draft);
-  };
+// 2. Settings & Users
+export const usersCollection = createFailoverRepository<{ id: string; name: string; email: string; role: string; }>('users');
+export const orgSettingsCollection = createFailoverRepository<{ id: string; key: string; value: string; }>('org_settings');
+export const zlaDocumentsCollection = createFailoverRepository<{ id: string; name: string; url: string; }>('zla_documents');
+export const directoryCollection = createFailoverRepository<{ id: string; name: string; category: string; }>('directory');
 
-  return {
-    insert: collection.insert,
-    update: singleDraftUpdate,
-    delete: collection.delete,
-    getAll: async () => queryClient.getQueryData<LogEntry[]>(['daily_logs']) || [],
-    findById: async (id: string) => {
-      const all = queryClient.getQueryData<LogEntry[]>(['daily_logs']) || [];
-      return all.find((item: LogEntry) => item.id === id);
-    }
-  };
-})();
+// 3. Medical & Logistics
+export const medicalLogsCollection = createFailoverRepository<ClinicalNote>('medical_logs');
+export const marChartsCollection = createFailoverRepository<{ id: string; animalId: string; noteType: string; }>('mar_charts');
+export const quarantineRecordsCollection = createFailoverRepository<{ id: string; animalId: string; startDate: string; }>('quarantine_records');
+export const movementsCollection = createFailoverRepository<{ id: string; animalId: string; from: string; to: string; }>('movements');
+export const transfersCollection = createFailoverRepository<{ id: string; animalId: string; from: string; to: string; }>('transfers');
 
-// 3. Tasks Collection
-export const tasksCollection = createStandardCollection<Task>('tasks');
+// 4. Staff & HR
+export const timesheetsCollection = createFailoverRepository<Timesheet>('timesheets');
+export const rotaCollection = createFailoverRepository<{ id: string; staffId: string; date: string; }>('rota');
+export const holidaysCollection = createFailoverRepository<{ id: string; staffId: string; date: string; }>('holidays');
 
-// --- SETTINGS & USERS MODULES ---
-export const usersCollection = createStandardCollection<{ id: string; name: string; email: string; role: string; }>('users');
-export const orgSettingsCollection = createStandardCollection<{ id: string; key: string; value: string; }>('org_settings');
-export const zlaDocumentsCollection = createStandardCollection<{ id: string; name: string; url: string; }>('zla_documents');
-export const directoryCollection = createStandardCollection<{ id: string; name: string; category: string; }>('directory');
-
-// --- MEDICAL & LOGISTICS MODULES ---
-export const medicalLogsCollection = createStandardCollection<ClinicalNote>('medical_logs');
-export const marChartsCollection = createStandardCollection<{ id: string; animalId: string; noteType: string; }>('mar_charts');
-export const quarantineRecordsCollection = createStandardCollection<{ id: string; animalId: string; startDate: string; }>('quarantine_records');
-export const movementsCollection = createStandardCollection<{ id: string; animalId: string; from: string; to: string; }>('movements');
-export const transfersCollection = createStandardCollection<{ id: string; animalId: string; from: string; to: string; }>('transfers');
-
-// --- STAFF MODULES ---
-export const timesheetsCollection = createStandardCollection<Timesheet>('timesheets');
-export const rotaCollection = createStandardCollection<{ id: string; staffId: string; date: string; }>('rota');
-export const holidaysCollection = createStandardCollection<{ id: string; staffId: string; date: string; }>('holidays');
-
-// --- SAFETY MODULES ---
-export const safetyDrillsCollection = createStandardCollection<{ id: string; title: string; date: string; }>('safety_drills');
-export const incidentsCollection = createStandardCollection<{ id: string; title: string; date: string; }>('incidents');
-export const maintenanceCollection = createStandardCollection<{ id: string; title: string; date: string; }>('maintenance');
-export const firstAidCollection = createStandardCollection<{ id: string; title: string; date: string; }>('first_aid');
+// 5. Safety & Maintenance
+export const safetyDrillsCollection = createFailoverRepository<{ id: string; title: string; date: string; }>('safety_drills');
+export const incidentsCollection = createFailoverRepository<{ id: string; title: string; date: string; }>('incidents');
+export const maintenanceCollection = createFailoverRepository<{ id: string; title: string; date: string; }>('maintenance');
+export const firstAidCollection = createFailoverRepository<{ id: string; title: string; date: string; }>('first_aid');

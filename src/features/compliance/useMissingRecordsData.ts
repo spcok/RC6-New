@@ -45,22 +45,13 @@ export function useMissingRecordsData() {
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await animalsCollection.findById(item.id);
-              if (existingRecord) {
-                await animalsCollection.update(item);
-              } else {
-                await animalsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await animalsCollection.sync(item);
           }
         }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
-        return await animalsCollection.getAll();
+        return await animalsCollection.getOfflineData();
       }
     }
   });
@@ -75,22 +66,13 @@ export function useMissingRecordsData() {
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await dailyLogsCollection.findById(item.id);
-              if (existingRecord) {
-                await dailyLogsCollection.update(item);
-              } else {
-                await dailyLogsCollection.insert(item as unknown as Record<string, unknown>);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await dailyLogsCollection.sync(item);
           }
         }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving daily logs from local vault.");
-        return await dailyLogsCollection.getAll();
+        return await dailyLogsCollection.getOfflineData();
       }
     }
   });
@@ -105,22 +87,13 @@ export function useMissingRecordsData() {
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await medicalLogsCollection.findById(item.id);
-              if (existingRecord) {
-                await medicalLogsCollection.update(item);
-              } else {
-                await medicalLogsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await medicalLogsCollection.sync(item);
           }
         }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving medical logs from local vault.");
-        return await medicalLogsCollection.getAll();
+        return await medicalLogsCollection.getOfflineData();
       }
     }
   });

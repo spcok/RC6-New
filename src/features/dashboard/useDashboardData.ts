@@ -38,16 +38,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await animalsCollection.findById(item.id);
-              if (existingRecord) {
-                await animalsCollection.update(item);
-              } else {
-                await animalsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await animalsCollection.sync(item);
           }
         }, 0);
         return mappedData;
@@ -69,16 +60,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await dailyLogsCollection.findById(item.id);
-              if (existingRecord) {
-                await dailyLogsCollection.update(item);
-              } else {
-                await dailyLogsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await dailyLogsCollection.sync(item);
           }
         }, 0);
         return mappedData;
@@ -100,16 +82,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await tasksCollection.findById(item.id);
-              if (existingRecord) {
-                await tasksCollection.update(item);
-              } else {
-                await tasksCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await tasksCollection.sync(item);
           }
         }, 0);
         return mappedData;

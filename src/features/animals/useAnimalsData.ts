@@ -33,23 +33,13 @@ export const useAnimalsData = () => {
 
         setTimeout(async () => {
             for (const item of mappedData) {
-                try {
-                    // Safe fallback to check existence before inserting
-                    const existingRecord = await animalsCollection.findById(item.id);
-                    if (existingRecord) {
-                        await animalsCollection.update(item.id, item);
-                    } else {
-                        await animalsCollection.insert(item);
-                    }
-                } catch (e) {
-                    console.warn(`[Vault Sync Warning] Failed to sync record ${item.id}:`, e);
-                }
+                await animalsCollection.sync(item);
             }
         }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
-        return await animalsCollection.getAll();
+        return await animalsCollection.getOfflineData();
       }
     }
   });
@@ -58,7 +48,7 @@ export const useAnimalsData = () => {
     onMutate: async (animal: Omit<Animal, 'id'>) => {
       const id = crypto.randomUUID();
       const newAnimal = { ...animal, id, isDeleted: false } as Animal;
-      await animalsCollection.insert(newAnimal);
+      await animalsCollection.sync(newAnimal);
       return { id, newAnimal };
     },
     mutationFn: async (animal: Omit<Animal, 'id'>) => {
@@ -128,7 +118,7 @@ export const useAnimalsData = () => {
 
   const updateAnimalMutation = useMutation({
     onMutate: async (animal: Animal) => {
-      await animalsCollection.update(animal as Animal & { id: string });
+      await animalsCollection.update(animal.id, animal);
       return { animal };
     },
     mutationFn: async (animal: Animal) => {

@@ -18,16 +18,7 @@ export function useFirstAidData() {
         
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await firstAidCollection.findById(item.id);
-              if (existingRecord) {
-                await firstAidCollection.update(item);
-              } else {
-                await firstAidCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await firstAidCollection.sync(item);
           }
         }, 0);
         return mappedData;
@@ -43,9 +34,9 @@ export function useFirstAidData() {
       const payload: FirstAidLog = {
         ...log,
         id: crypto.randomUUID(),
-        created_at: new Date().toISOString()
+        createdAt: new Date().toISOString()
       } as FirstAidLog;
-      await firstAidCollection.insert(payload);
+      await firstAidCollection.sync(payload);
       return { payload };
     },
     mutationFn: async (log: Omit<FirstAidLog, 'id' | 'created_at'>) => {
@@ -68,7 +59,7 @@ export function useFirstAidData() {
 
   const deleteFirstAidMutation = useMutation({
     onMutate: async (id: string) => {
-      await firstAidCollection.update(id, (prev) => ({ ...prev, is_deleted: true }));
+      await firstAidCollection.update(id, { isDeleted: true });
       return { id };
     },
     mutationFn: async (id: string) => {

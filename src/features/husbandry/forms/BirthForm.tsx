@@ -39,7 +39,7 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
         
         if (!existingLog) {
           for (const pup of safePayload.pups) {
-            await animalsCollection.insert({
+            await animalsCollection.sync({
               id: pup.id,
               name: pup.name,
               species: animal.species,
@@ -61,7 +61,7 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
               isQuarantine: false,
               displayOrder: 0,
               isDeleted: false
-            });
+            } as Animal);
           }
         }
 

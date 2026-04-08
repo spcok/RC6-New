@@ -48,23 +48,13 @@ export const useTransfersData = () => {
         
         setTimeout(async () => {
           for (const item of transfers) {
-            try {
-              const sanitizedItem = sanitizePayload(item);
-              const existingRecord = await transfersCollection.findById(sanitizedItem.id);
-              if (existingRecord) {
-                await transfersCollection.update(sanitizedItem);
-              } else {
-                await transfersCollection.insert(sanitizedItem);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await transfersCollection.sync(sanitizePayload(item));
           }
         }, 0);
         return transfers;
       } catch {
         console.warn("Network unreachable. Serving transfers from local vault.");
-        return await transfersCollection.getAll();
+        return await transfersCollection.getOfflineData();
       }
     }
   });
@@ -76,7 +66,7 @@ export const useTransfersData = () => {
       const payload: Transfer = sanitizePayload({ ...transfer, id: crypto.randomUUID(), isDeleted: false } as Transfer);
       
       queryClient.setQueryData(['transfers'], [...(previousTransfers || []), payload]);
-      await transfersCollection.insert(payload);
+      await transfersCollection.sync(payload);
       
       return { previousTransfers };
     },
@@ -112,7 +102,7 @@ export const useTransfersData = () => {
       queryClient.setQueryData(['transfers'], (old: Transfer[] = []) => 
         old.map(t => t.id === transfer.id ? { ...t, ...transfer } : t)
       );
-      await transfersCollection.update(sanitizePayload(transfer));
+      await transfersCollection.update(transfer.id, sanitizePayload(transfer));
       
       return { previousTransfers };
     },
@@ -130,7 +120,7 @@ export const useTransfersData = () => {
       };
       const { error } = await supabase.from('transfers').update(supabasePayload).eq('id', transfer.id);
       if (error) throw error;
-      await transfersCollection.update(sanitizePayload(transfer));
+      await transfersCollection.update(transfer.id, sanitizePayload(transfer));
     },
     onError: (_err, _transfer, context) => {
       queryClient.setQueryData(['transfers'], context?.previousTransfers);
@@ -146,10 +136,7 @@ export const useTransfersData = () => {
       queryClient.setQueryData(['transfers'], (old: Transfer[] = []) => 
         old.map(t => t.id === id ? { ...t, isDeleted: true } : t)
       );
-      const existing = transfers.find(t => t.id === id);
-      if (existing) {
-        await transfersCollection.update(sanitizePayload({ ...existing, isDeleted: true }));
-      }
+      await transfersCollection.update(id, { isDeleted: true });
       
       return { previousTransfers };
     },

@@ -18,16 +18,7 @@ export const useMaintenanceData = () => {
 
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await maintenanceCollection.findById(item.id);
-              if (existingRecord) {
-                await maintenanceCollection.update(item);
-              } else {
-                await maintenanceCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await maintenanceCollection.sync(item);
           }
         }, 0);
         
@@ -46,7 +37,7 @@ export const useMaintenanceData = () => {
       const payload: MaintenanceLog = { ...newTask, id: crypto.randomUUID() } as MaintenanceLog;
       
       queryClient.setQueryData(['maintenance'], [...(previousLogs || []), payload]);
-      await maintenanceCollection.insert(payload);
+      await maintenanceCollection.sync(payload);
       
       return { previousLogs };
     },
@@ -79,7 +70,7 @@ export const useMaintenanceData = () => {
       queryClient.setQueryData(['maintenance'], (old: MaintenanceLog[] = []) => 
         old.map(l => l.id === task.id ? { ...l, ...task } : l)
       );
-      await maintenanceCollection.update(task.id, (prev) => ({ ...prev, ...task }));
+      await maintenanceCollection.update(task.id, task);
       
       return { previousLogs };
     },
@@ -110,7 +101,7 @@ export const useMaintenanceData = () => {
       queryClient.setQueryData(['maintenance'], (old: MaintenanceLog[] = []) => 
         old.map(l => l.id === id ? { ...l, isDeleted: true } : l)
       );
-      await maintenanceCollection.update(id, (prev) => ({ ...prev, isDeleted: true }));
+      await maintenanceCollection.update(id, { isDeleted: true });
       
       return { previousLogs };
     },

@@ -29,30 +29,21 @@ export function useOrgSettings() {
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of data) {
-            try {
-              const existingRecord = await orgSettingsCollection.findById(item.id);
-              if (existingRecord) {
-                await orgSettingsCollection.update(item);
-              } else {
-                await orgSettingsCollection.insert(item as OrgProfileSettings);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await orgSettingsCollection.sync(item);
           }
         }, 0);
         
         return data as OrgProfileSettings[];
       } catch {
         console.warn("Network unreachable. Serving from local vault.");
-        return await orgSettingsCollection.getAll();
+        return await orgSettingsCollection.getOfflineData();
       }
     }
   });
 
   const saveSettingsMutation = useMutation({
     onMutate: async (newSettings: OrgProfileSettings) => {
-      await orgSettingsCollection.update(newSettings.id, () => newSettings);
+      await orgSettingsCollection.sync(newSettings);
       return { newSettings };
     },
     mutationFn: async (newSettings: OrgProfileSettings) => {

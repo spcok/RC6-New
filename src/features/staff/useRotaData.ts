@@ -18,16 +18,7 @@ export const useRotaData = () => {
 
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await rotaCollection.findById(item.id);
-              if (existingRecord) {
-                await rotaCollection.update(item);
-              } else {
-                await rotaCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await rotaCollection.sync(item);
           }
         }, 0);
         
@@ -51,7 +42,7 @@ export const useRotaData = () => {
       } as Shift;
       
       queryClient.setQueryData(['rota'], [...(previousShifts || []), payload]);
-      await rotaCollection.insert(payload);
+      await rotaCollection.sync(payload);
       
       return { previousShifts };
     },
@@ -91,7 +82,7 @@ export const useRotaData = () => {
       queryClient.setQueryData(['rota'], (old: Shift[] = []) => 
         old.map(s => s.id === shift.id ? { ...s, ...shift } : s)
       );
-      await rotaCollection.update(shift.id, (prev) => ({ ...prev, ...shift }) as Shift);
+      await rotaCollection.update(shift.id, shift);
       
       return { previousShifts };
     },
@@ -123,7 +114,7 @@ export const useRotaData = () => {
       queryClient.setQueryData(['rota'], (old: Shift[] = []) => 
         old.map(s => s.id === id ? { ...s, isDeleted: true } : s)
       );
-      await rotaCollection.update(id, (prev) => ({ ...prev, isDeleted: true }) as Shift);
+      await rotaCollection.update(id, { isDeleted: true });
       
       return { previousShifts };
     },

@@ -15,16 +15,7 @@ export const useSafetyDrillData = () => {
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of data) {
-            try {
-              const existingRecord = await safetyDrillsCollection.findById(item.id);
-              if (existingRecord) {
-                await safetyDrillsCollection.update(item);
-              } else {
-                await safetyDrillsCollection.insert(item as SafetyDrill);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await safetyDrillsCollection.sync(item);
           }
         }, 0);
         return data as SafetyDrill[];
@@ -38,7 +29,7 @@ export const useSafetyDrillData = () => {
   const addDrillLogMutation = useMutation({
     onMutate: async (newDrill: Omit<SafetyDrill, 'id'>) => {
       const payload: SafetyDrill = { ...newDrill, id: crypto.randomUUID() } as SafetyDrill;
-      await safetyDrillsCollection.insert(payload);
+      await safetyDrillsCollection.sync(payload);
       return { payload };
     },
     mutationFn: async (newDrill: Omit<SafetyDrill, 'id'>) => {
@@ -51,7 +42,7 @@ export const useSafetyDrillData = () => {
 
   const deleteDrillLogMutation = useMutation({
     onMutate: async (id: string) => {
-      await safetyDrillsCollection.update(id, (prev) => ({ ...prev, is_deleted: true }));
+      await safetyDrillsCollection.update(id, { is_deleted: true } as any);
       return { id };
     },
     mutationFn: async (id: string) => {

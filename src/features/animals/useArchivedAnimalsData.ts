@@ -5,7 +5,7 @@ export function useArchivedAnimalsData() {
   const { data: animals = [], isLoading } = useQuery({
     queryKey: ['animals'],
     queryFn: async () => {
-      return await animalsCollection.getAll();
+      return await animalsCollection.getOfflineData();
     }
   });
   

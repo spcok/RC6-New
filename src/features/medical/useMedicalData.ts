@@ -20,22 +20,13 @@ export const useMedicalData = (animalId?: string) => {
 
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await medicalLogsCollection.findById(item.id);
-              if (existingRecord) {
-                await medicalLogsCollection.update(item);
-              } else {
-                await medicalLogsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await medicalLogsCollection.sync(item);
           }
         }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving Medical Records from local vault.");
-        return await medicalLogsCollection.getAll();
+        return await medicalLogsCollection.getOfflineData();
       }
     }
   });
@@ -52,22 +43,13 @@ export const useMedicalData = (animalId?: string) => {
 
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await marChartsCollection.findById(item.id);
-              if (existingRecord) {
-                await marChartsCollection.update(item);
-              } else {
-                await marChartsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await marChartsCollection.sync(item);
           }
         }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving MAR Charts from local vault.");
-        return await marChartsCollection.getAll();
+        return await marChartsCollection.getOfflineData();
       }
     }
   });
@@ -84,22 +66,13 @@ export const useMedicalData = (animalId?: string) => {
 
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await quarantineRecordsCollection.findById(item.id);
-              if (existingRecord) {
-                await quarantineRecordsCollection.update(item);
-              } else {
-                await quarantineRecordsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await quarantineRecordsCollection.sync(item);
           }
         }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving Quarantine Records from local vault.");
-        return await quarantineRecordsCollection.getAll();
+        return await quarantineRecordsCollection.getOfflineData();
       }
     }
   });
@@ -115,12 +88,7 @@ export const useMedicalData = (animalId?: string) => {
       const newNote = { id: note.id || crypto.randomUUID(), ...note, isDeleted: false } as ClinicalNote;
       
       queryClient.setQueryData(['medical_records'], [...(previousNotes || []), newNote]);
-      const existingNote = await medicalLogsCollection.findById(newNote.id);
-      if (existingNote) {
-        await medicalLogsCollection.update(newNote.id, newNote);
-      } else {
-        await medicalLogsCollection.insert(newNote);
-      }
+      await medicalLogsCollection.sync(newNote);
       
       return { previousNotes };
     },
@@ -166,7 +134,7 @@ export const useMedicalData = (animalId?: string) => {
       queryClient.setQueryData(['medical_records'], (old: ClinicalNote[] = []) => 
         old.map(n => n.id === note.id ? { ...n, ...note } : n)
       );
-      await medicalLogsCollection.update(note.id, (prev) => ({ ...prev, ...note }) as ClinicalNote);
+      await medicalLogsCollection.update(note.id, note);
       
       return { previousNotes };
     },
@@ -208,12 +176,7 @@ export const useMedicalData = (animalId?: string) => {
       const newChart = { id: chart.id || crypto.randomUUID(), ...chart, isDeleted: false } as MARChart;
       
       queryClient.setQueryData(['mar_charts'], [...(previousCharts || []), newChart]);
-      const existingChart = await marChartsCollection.findById(newChart.id);
-      if (existingChart) {
-        await marChartsCollection.update(newChart.id, newChart);
-      } else {
-        await marChartsCollection.insert(newChart);
-      }
+      await marChartsCollection.sync(newChart);
       
       return { previousCharts };
     },
@@ -252,12 +215,7 @@ export const useMedicalData = (animalId?: string) => {
       const newRecord = { id: record.id || crypto.randomUUID(), ...record, isDeleted: false } as QuarantineRecord;
       
       queryClient.setQueryData(['quarantine_records'], [...(previousRecords || []), newRecord]);
-      const existingRecord = await quarantineRecordsCollection.findById(newRecord.id);
-      if (existingRecord) {
-        await quarantineRecordsCollection.update(newRecord.id, newRecord);
-      } else {
-        await quarantineRecordsCollection.insert(newRecord);
-      }
+      await quarantineRecordsCollection.sync(newRecord);
       
       return { previousRecords };
     },
@@ -294,7 +252,7 @@ export const useMedicalData = (animalId?: string) => {
       queryClient.setQueryData(['quarantine_records'], (old: QuarantineRecord[] = []) => 
         old.map(r => r.id === record.id ? { ...r, ...record } : r)
       );
-      await quarantineRecordsCollection.update(record.id, (prev) => ({ ...prev, ...record }) as QuarantineRecord);
+      await quarantineRecordsCollection.update(record.id, record);
       
       return { previousRecords };
     },

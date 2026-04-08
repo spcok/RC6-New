@@ -1,9 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AnimalCategory, DailyRound, LogType } from '../../types';
 import { useQuery } from '@tanstack/react-query';
-import { animalsCollection, dailyLogsCollection, createStandardCollection } from '../../lib/database';
-
-const dailyRoundsCollection = createStandardCollection('daily_rounds');
+import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '../../lib/database';
 
 interface AnimalCheckState {
     isAlive?: boolean;
@@ -16,15 +14,15 @@ interface AnimalCheckState {
 export function useDailyRoundData(viewDate: string) {
     const { data: allAnimals = [], isLoading: isLoadingAnimals } = useQuery({
         queryKey: ['animals'],
-        queryFn: async () => await animalsCollection.getAll()
+        queryFn: async () => await animalsCollection.getOfflineData()
     });
     const { data: liveLogs = [], isLoading: isLoadingLogs } = useQuery({
         queryKey: ['dailyLogs'],
-        queryFn: async () => await dailyLogsCollection.getAll()
+        queryFn: async () => await dailyLogsCollection.getOfflineData()
     });
     const { data: liveRounds = [], isLoading: isLoadingRounds } = useQuery({
         queryKey: ['dailyRounds'],
-        queryFn: async () => await dailyRoundsCollection.getAll()
+        queryFn: async () => await dailyRoundsCollection.getOfflineData()
     });
     
     const isLoading = isLoadingAnimals || isLoadingLogs || isLoadingRounds;
@@ -116,14 +114,9 @@ export function useDailyRoundData(viewDate: string) {
                 notes: generalNotes,
                 status: 'completed',
                 completedAt: new Date().toISOString()
-            };
+            } as DailyRound;
 
-            const existingRecord = await dailyRoundsCollection.findById(roundId);
-            if (existingRecord) {
-                await dailyRoundsCollection.update({ ...existingRecord, ...roundData });
-            } else {
-                await dailyRoundsCollection.insert(roundData as DailyRound);
-            }
+            await dailyRoundsCollection.sync(roundData);
         } catch (error) {
             console.error('Failed to sign off round:', error);
         } finally {

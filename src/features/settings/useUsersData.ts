@@ -21,30 +21,20 @@ export const useUsersData = () => {
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of camelCaseData) {
-            try {
-              const existingRecord = await usersCollection.findById(item.id);
-              if (existingRecord) {
-                await usersCollection.update(item);
-              } else {
-                await usersCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await usersCollection.sync(item);
           }
         }, 0);
         return camelCaseData;
       } catch {
         console.warn("Network unreachable. Serving users from local vault.");
-        const localData = await usersCollection.getAll();
-        return localData as unknown as UserProfile[];
+        return await usersCollection.getOfflineData();
       }
     }
   });
 
   const updateUserMutation = useMutation({
     onMutate: async (user: UserProfile) => {
-      await usersCollection.update(user);
+      await usersCollection.sync(user);
     },
     mutationFn: async (user: UserProfile) => {
       // Map back to snake_case for Supabase

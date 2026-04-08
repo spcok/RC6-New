@@ -35,24 +35,14 @@ export const useTaskData = () => {
         
         setTimeout(async () => {
             for (const item of mappedData) {
-                try {
-                    // Safe fallback to check existence before inserting
-                    const existingRecord = await tasksCollection.findById(item.id);
-                    if (existingRecord) {
-                        await tasksCollection.update(item.id, item);
-                    } else {
-                        await tasksCollection.insert(item);
-                    }
-                } catch (e) {
-                    console.warn(`[Vault Sync Warning] Failed to sync record ${item.id}:`, e);
-                }
+                await tasksCollection.sync(item);
             }
         }, 0);
         
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving tasks from local vault.");
-        return await tasksCollection.getAll();
+        return await tasksCollection.getOfflineData();
       }
     }
   });
@@ -66,7 +56,7 @@ export const useTaskData = () => {
         completed: newTask.completed || false,
         isDeleted: false
       } as Task);
-      await tasksCollection.insert(task);
+      await tasksCollection.sync(task);
       return { task };
     },
     mutationFn: async (newTask: Partial<Task>) => {
@@ -104,7 +94,7 @@ export const useTaskData = () => {
       if (!task) throw new Error("Task not found");
       
       const updatedTask = sanitizePayload({ ...task, completed: true });
-      await tasksCollection.update(updatedTask);
+      await tasksCollection.update(taskId, { completed: true });
       return { updatedTask };
     },
     mutationFn: async (taskId: string) => {
@@ -120,7 +110,7 @@ export const useTaskData = () => {
       if (!task) throw new Error("Task not found");
       
       const updatedTask = sanitizePayload({ ...task, isDeleted: true });
-      await tasksCollection.update(updatedTask);
+      await tasksCollection.update(taskId, { isDeleted: true });
       return { updatedTask };
     },
     mutationFn: async (taskId: string) => {

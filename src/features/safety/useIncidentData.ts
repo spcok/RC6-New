@@ -18,16 +18,7 @@ export const useIncidentData = () => {
 
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const existingRecord = await incidentsCollection.findById(item.id);
-              if (existingRecord) {
-                await incidentsCollection.update(item);
-              } else {
-                await incidentsCollection.insert(item);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await incidentsCollection.sync(item);
           }
         }, 0);
         
@@ -51,7 +42,7 @@ export const useIncidentData = () => {
       } as Incident;
       
       queryClient.setQueryData(['incidents'], [...(previousIncidents || []), payload]);
-      await incidentsCollection.insert(payload);
+      await incidentsCollection.sync(payload);
       
       return { previousIncidents };
     },
@@ -85,7 +76,7 @@ export const useIncidentData = () => {
       queryClient.setQueryData(['incidents'], (old: Incident[] = []) => 
         old.map(i => i.id === id ? { ...i, isDeleted: true } : i)
       );
-      await incidentsCollection.update(id, (prev) => ({ ...prev, isDeleted: true }) as Incident);
+      await incidentsCollection.update(id, { isDeleted: true });
       
       return { previousIncidents };
     },

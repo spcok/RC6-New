@@ -35,24 +35,14 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
         
         setTimeout(async () => {
             for (const item of mappedData) {
-                try {
-                    // Safe fallback to check existence before inserting
-                    const existingRecord = await dailyLogsCollection.findById(item.id);
-                    if (existingRecord) {
-                        await dailyLogsCollection.update(item.id, item);
-                    } else {
-                        await dailyLogsCollection.insert(item);
-                    }
-                } catch (e) {
-                    console.warn(`[Vault Sync Warning] Failed to sync record ${item.id}:`, e);
-                }
+                await dailyLogsCollection.sync(item);
             }
         }, 0);
         
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving from local vault.");
-        return await dailyLogsCollection.getAll();
+        return await dailyLogsCollection.getOfflineData();
       }
     }
   });
@@ -80,12 +70,7 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
         ...entry
       } as LogEntry;
       
-      const existing = await dailyLogsCollection.findById(newEntry.id);
-      if (existing) {
-        await dailyLogsCollection.update(newEntry.id, newEntry);
-      } else {
-        await dailyLogsCollection.insert(newEntry);
-      }
+      await dailyLogsCollection.sync(newEntry);
       return { newEntry };
     },
     mutationFn: async (entry: Partial<LogEntry>) => {
@@ -130,11 +115,7 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
       if (!entry.id) return;
       
       const existing = await dailyLogsCollection.findById(entry.id);
-      if (existing) {
-        await dailyLogsCollection.update(entry.id, { ...existing, ...entry });
-      } else {
-        await dailyLogsCollection.insert({ ...existing, ...entry } as LogEntry);
-      }
+      await dailyLogsCollection.sync({ ...existing, ...entry } as LogEntry);
       return { entry };
     },
     mutationFn: async (entry: Partial<LogEntry>) => {
@@ -172,7 +153,7 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
     onMutate: async (id: string) => {
       const existing = logs.find(l => l.id === id);
       if (existing) {
-        await dailyLogsCollection.update({ ...existing, isDeleted: true } as LogEntry & { id: string });
+        await dailyLogsCollection.update(id, { isDeleted: true });
       }
       return { id };
     },

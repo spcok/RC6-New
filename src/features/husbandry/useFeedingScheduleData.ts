@@ -48,24 +48,14 @@ export function useFeedingScheduleData(date: string) {
         // Refresh local vault (Upsert Pattern)
         setTimeout(async () => {
           for (const item of mappedData) {
-            try {
-              const sanitizedItem = sanitizePayload(item);
-              const existingRecord = await dailyLogsCollection.findById(sanitizedItem.id);
-              if (existingRecord) {
-                await dailyLogsCollection.update(sanitizedItem);
-              } else {
-                await dailyLogsCollection.insert(sanitizedItem);
-              }
-            } catch (e) {
-              console.warn(`[Vault Sync Warning] Failed to upsert record ${item.id}:`, e);
-            }
+            await dailyLogsCollection.sync(sanitizePayload(item));
           }
         }, 0);
         
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving from local vault.");
-        return await dailyLogsCollection.getAll();
+        return await dailyLogsCollection.getOfflineData();
       }
     }
   });
