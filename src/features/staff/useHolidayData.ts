@@ -1,53 +1,41 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLiveQuery } from '@tanstack/react-db';
 import { holidaysCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
-import { Holiday } from '../../types';
 
-export function useHolidayData() {
+export const useHolidayData = () => {
   const queryClient = useQueryClient();
 
-  const { data: holidays = [], isLoading } = useQuery<Holiday[]>({
+  const { data: holidays = [], isLoading } = useLiveQuery<any[]>({
     queryKey: ['holidays'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from('holidays').select('*').eq('is_deleted', false);
-        if (error) throw error;
-        
-        const mappedData = data as Holiday[];
-        
-        return mappedData;
-      } catch {
-        console.warn("Network unreachable. Serving holidays from local vault.");
-        return await holidaysCollection.getAll();
-      }
-    }
   });
 
   const addHolidayMutation = useMutation({
-    mutationFn: async (holiday: Omit<Holiday, 'id'>) => {
-      const payload = { ...holiday, id: crypto.randomUUID(), is_deleted: false } as Holiday;
-      await holidaysCollection.sync(payload);
-      
-      const { error } = await supabase.from('holidays').insert([payload]);
-      if (error) throw error;
-      return payload;
+    mutationFn: async (holiday: any) => {
+      const newHoliday = { ...holiday, id: holiday.id || crypto.randomUUID(), isDeleted: false };
+      await holidaysCollection.insert(newHoliday);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
+  });
+
+  const updateHolidayMutation = useMutation({
+    mutationFn: async (holiday: any) => {
+      await holidaysCollection.update(holiday.id, holiday);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
   });
 
   const deleteHolidayMutation = useMutation({
     mutationFn: async (id: string) => {
-      await holidaysCollection.update(id, { is_deleted: true } as any);
-      const { error } = await supabase.from('holidays').update({ is_deleted: true }).eq('id', id);
-      if (error) throw error;
+      await holidaysCollection.delete(id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
   });
 
   return {
-    holidays: holidays.filter(h => !h.is_deleted),
+    holidays: holidays.filter(h => !h.isDeleted),
     isLoading,
     addHoliday: addHolidayMutation.mutateAsync,
+    updateHoliday: updateHolidayMutation.mutateAsync,
     deleteHoliday: deleteHolidayMutation.mutateAsync,
   };
-}
+};

@@ -5,7 +5,8 @@ import { useAuthStore } from '../../store/authStore';
 import { TimesheetStatus } from '../../types';
 
 export const ClockInButton: React.FC = () => {
-  const { timesheets, clockIn, clockOut } = useTimesheetData();
+  // Swapped out legacy clockIn/clockOut for the standardized CRUD hooks
+  const { timesheets, addTimesheet, updateTimesheet } = useTimesheetData();
   const { currentUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -18,10 +19,26 @@ export const ClockInButton: React.FC = () => {
   const handleToggle = async () => {
     setIsLoading(true);
     try {
+      const now = new Date().toISOString();
+
       if (openShift) {
-        await clockOut(openShift.id);
+        // Calculate the duration of the shift locally before updating the vault
+        const durationMs = new Date(now).getTime() - new Date(openShift.clockIn).getTime();
+        const totalHours = Number((durationMs / (1000 * 60 * 60)).toFixed(2));
+
+        await updateTimesheet({
+          id: openShift.id,
+          clockOut: now,
+          totalHours,
+          status: TimesheetStatus.COMPLETED
+        });
       } else if (currentUser?.name) {
-        await clockIn(currentUser.name);
+        await addTimesheet({
+          staffName: currentUser.name,
+          date: now.split('T')[0],
+          clockIn: now,
+          status: TimesheetStatus.ACTIVE,
+        });
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -37,7 +54,7 @@ export const ClockInButton: React.FC = () => {
   return (
     <button
       onClick={handleToggle}
-      disabled={isLoading}
+      disabled={isLoading || !currentUser}
       className={`
         flex items-center px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all shadow-sm
         ${openShift 

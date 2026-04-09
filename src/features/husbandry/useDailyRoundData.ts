@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AnimalCategory, DailyRound, LogType } from '../../types';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '../../lib/database';
 
 interface AnimalCheckState {
@@ -12,17 +13,18 @@ interface AnimalCheckState {
 }
 
 export function useDailyRoundData(viewDate: string) {
-    const { data: allAnimals = [], isLoading: isLoadingAnimals } = useQuery({
-        queryKey: ['animals'],
-        queryFn: async () => await animalsCollection.getOfflineData()
+    const queryClient = useQueryClient();
+
+    // 1. REACTIVE UI: Watch the local IndexedDB vault instantly via useLiveQuery
+    // Query keys must match the exact table names defined in database.ts
+    const { data: allAnimals = [], isLoading: isLoadingAnimals } = useLiveQuery({
+        queryKey: ['animals']
     });
-    const { data: liveLogs = [], isLoading: isLoadingLogs } = useQuery({
-        queryKey: ['dailyLogs'],
-        queryFn: async () => await dailyLogsCollection.getOfflineData()
+    const { data: liveLogs = [], isLoading: isLoadingLogs } = useLiveQuery({
+        queryKey: ['daily_logs']
     });
-    const { data: liveRounds = [], isLoading: isLoadingRounds } = useQuery({
-        queryKey: ['dailyRounds'],
-        queryFn: async () => await dailyRoundsCollection.getOfflineData()
+    const { data: liveRounds = [], isLoading: isLoadingRounds } = useLiveQuery({
+        queryKey: ['daily_rounds']
     });
     
     const isLoading = isLoadingAnimals || isLoadingLogs || isLoadingRounds;
@@ -33,7 +35,6 @@ export function useDailyRoundData(viewDate: string) {
     const [checks, setChecks] = useState<Record<string, AnimalCheckState>>({});
     const [signingInitials, setSigningInitials] = useState('');
     const [generalNotes, setGeneralNotes] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const currentRound = useMemo(() => liveRounds.find(r => r.shift === roundType && r.section === activeTab && r.date === viewDate), [liveRounds, roundType, activeTab, viewDate]);
     const isPastRound = currentRound?.status?.toLowerCase() === 'completed';
@@ -98,12 +99,21 @@ export function useDailyRoundData(viewDate: string) {
     const isComplete = totalAnimals > 0 && completedChecks === totalAnimals;
     const isNoteRequired = useMemo(() => false, []);
 
+    // 2. REMOTE MUTATION: Wrap sign-off in TanStack Query to track state, push to Failover Vault
+    const signOffMutation = useMutation({
+        mutationFn: async (roundData: DailyRound) => {
+            await dailyRoundsCollection.insert(roundData);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['daily_rounds'] });
+        }
+    });
+
     const handleSignOff = async () => {
         if (!isComplete || !signingInitials) return;
-        setIsSubmitting(true);
+        
         try {
             const roundId = currentRound?.id || crypto.randomUUID();
-            
             const roundData = {
                 id: roundId,
                 date: viewDate,
@@ -116,15 +126,38 @@ export function useDailyRoundData(viewDate: string) {
                 completedAt: new Date().toISOString()
             } as DailyRound;
 
-            await dailyRoundsCollection.sync(roundData);
+            await signOffMutation.mutateAsync(roundData);
         } catch (error) {
             console.error('Failed to sign off round:', error);
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
     const currentUser = { signature_data: 'https://upload.wikimedia.org/wikipedia/commons/f/f8/John_Hancock_signature.png' };
 
-    return { categoryAnimals, isLoading, roundType, setRoundType, activeTab, setActiveTab, checks, progress, isComplete, isNoteRequired, signingInitials, setSigningInitials, generalNotes, setGeneralNotes, isSubmitting, isPastRound, toggleWater, toggleSecure, toggleHealth, handleSignOff, currentUser, completedChecks, totalAnimals, freezingRisks };
+    return { 
+        categoryAnimals, 
+        isLoading, 
+        roundType, 
+        setRoundType, 
+        activeTab, 
+        setActiveTab, 
+        checks, 
+        progress, 
+        isComplete, 
+        isNoteRequired, 
+        signingInitials, 
+        setSigningInitials, 
+        generalNotes, 
+        setGeneralNotes, 
+        isSubmitting: signOffMutation.isPending, // Maps natively to the UI's loading spinner
+        isPastRound, 
+        toggleWater, 
+        toggleSecure, 
+        toggleHealth, 
+        handleSignOff, 
+        currentUser, 
+        completedChecks, 
+        totalAnimals, 
+        freezingRisks 
+    };
 }

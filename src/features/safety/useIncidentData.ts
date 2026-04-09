@@ -1,85 +1,25 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLiveQuery } from '@tanstack/react-db';
 import { incidentsCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
-import { Incident } from '../../types';
-import { mapToCamelCase } from '../../lib/dataMapping';
 
 export const useIncidentData = () => {
   const queryClient = useQueryClient();
 
-  const { data: incidents = [], isLoading } = useQuery<Incident[]>({
+  const { data: incidents = [], isLoading } = useLiveQuery<any[]>({
     queryKey: ['incidents'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from('incidents').select('*');
-        if (error) throw error;
-        
-        const mappedData: Incident[] = data.map((item: Record<string, unknown>) => mapToCamelCase<Incident>(item));
-
-        return mappedData;
-      } catch {
-        console.warn("Network unreachable. Serving incidents from local vault.");
-        return await incidentsCollection.getAll();
-      }
-    }
   });
 
   const addIncidentMutation = useMutation({
-    onMutate: async (incident: Omit<Incident, 'id' | 'createdAt'>) => {
-      await queryClient.cancelQueries({ queryKey: ['incidents'] });
-      const previousIncidents = queryClient.getQueryData<Incident[]>(['incidents']);
-      const payload: Incident = {
-        ...incident,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        isDeleted: false
-      } as Incident;
-      
-      queryClient.setQueryData(['incidents'], [...(previousIncidents || []), payload]);
-      await incidentsCollection.sync(payload);
-      
-      return { previousIncidents };
-    },
-    mutationFn: async (incident: Omit<Incident, 'id' | 'createdAt'>) => {
-      const payload = { ...incident, id: crypto.randomUUID(), createdAt: new Date().toISOString(), isDeleted: false };
-      const supabasePayload = {
-        id: payload.id,
-        animal_id: payload.animalId,
-        incident_type: payload.incidentType,
-        description: payload.description,
-        severity: payload.severity,
-        staff_initials: payload.staffInitials,
-        created_at: payload.createdAt,
-        is_deleted: payload.isDeleted
-      };
-      
-      const { error } = await supabase.from('incidents').insert([supabasePayload]);
-      if (error) throw error;
-    },
-    onError: (_err, _incident, context) => {
-      queryClient.setQueryData(['incidents'], context?.previousIncidents);
+    mutationFn: async (incident: any) => {
+      const newIncident = { ...incident, id: incident.id || crypto.randomUUID(), isDeleted: false };
+      await incidentsCollection.insert(newIncident);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['incidents'] })
   });
 
-  const deleteIncidentMutation = useMutation({
-    onMutate: async (id: string) => {
-      await queryClient.cancelQueries({ queryKey: ['incidents'] });
-      const previousIncidents = queryClient.getQueryData<Incident[]>(['incidents']);
-      
-      queryClient.setQueryData(['incidents'], (old: Incident[] = []) => 
-        old.map(i => i.id === id ? { ...i, isDeleted: true } : i)
-      );
-      await incidentsCollection.update(id, { isDeleted: true });
-      
-      return { previousIncidents };
-    },
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('incidents').update({ is_deleted: true }).eq('id', id);
-      if (error) throw error;
-    },
-    onError: (_err, _id, context) => {
-      queryClient.setQueryData(['incidents'], context?.previousIncidents);
+  const updateIncidentMutation = useMutation({
+    mutationFn: async (incident: any) => {
+      await incidentsCollection.update(incident.id, incident);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['incidents'] })
   });
@@ -88,7 +28,6 @@ export const useIncidentData = () => {
     incidents: incidents.filter(i => !i.isDeleted),
     isLoading,
     addIncident: addIncidentMutation.mutateAsync,
-    deleteIncident: deleteIncidentMutation.mutateAsync,
-    isMutating: addIncidentMutation.isPending || deleteIncidentMutation.isPending
+    updateIncident: updateIncidentMutation.mutateAsync,
   };
 };
