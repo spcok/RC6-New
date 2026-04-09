@@ -2,34 +2,38 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { orgSettingsCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { OrgProfileSettings } from '../../types';
+import { mapToCamelCase } from '../../lib/dataMapping';
 
 const DEFAULT_SETTINGS: OrgProfileSettings = {
   id: 'profile',
-  org_name: 'Kent Owl Academy',
-  logo_url: '',
-  contact_email: '',
-  contact_phone: '',
+  orgName: '',
+  logoUrl: '',
+  contactEmail: '',
+  contactPhone: '',
   address: '',
-  zla_license_number: '',
-  official_website: '',
-  adoption_portal: '',
+  zlaLicenseNumber: '',
+  officialWebsite: '',
+  adoptionPortal: '',
 };
 
 export function useOrgSettings() {
   const queryClient = useQueryClient();
 
-  // 1. FETCH SETTINGS (Online-First)
-  const { data: settings = [], isLoading } = useQuery<OrgProfileSettings[]>({
+  const { data: settings, isLoading } = useQuery<OrgProfileSettings>({
     queryKey: ['orgSettings'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.from('org_settings').select('*');
+        // Target the plural 'organisations' table
+        const { data, error } = await supabase.from('organisations').select('*').limit(1).maybeSingle();
         if (error) throw error;
         
-        return data as OrgProfileSettings[];
-      } catch {
-        console.warn("Network unreachable. Serving from local vault.");
-        return await orgSettingsCollection.getAll();
+        if (!data) return DEFAULT_SETTINGS;
+        
+        return mapToCamelCase<OrgProfileSettings>(data);
+      } catch (err) {
+        console.warn("Network unreachable or RLS blocked. Serving from local vault.", err);
+        const localData = await orgSettingsCollection.getAll();
+        return localData.length > 0 ? localData[0] : DEFAULT_SETTINGS;
       }
     }
   });
@@ -40,14 +44,27 @@ export function useOrgSettings() {
       return { newSettings };
     },
     mutationFn: async (newSettings: OrgProfileSettings) => {
-      const { error } = await supabase.from('org_settings').upsert([newSettings]);
+      const supabasePayload = {
+        id: newSettings.id || 'profile',
+        org_name: newSettings.orgName,
+        logo_url: newSettings.logoUrl,
+        contact_email: newSettings.contactEmail,
+        contact_phone: newSettings.contactPhone,
+        address: newSettings.address,
+        zla_license_number: newSettings.zlaLicenseNumber,
+        official_website: newSettings.officialWebsite,
+        adoption_portal: newSettings.adoptionPortal
+      };
+      
+      // Target the plural 'organisations' table
+      const { error } = await supabase.from('organisations').upsert([supabasePayload]);
       if (error) throw error;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['orgSettings'] })
   });
 
   return { 
-    settings: settings[0] || DEFAULT_SETTINGS, 
+    settings: settings || DEFAULT_SETTINGS, 
     isLoading, 
     saveSettings: saveSettingsMutation.mutateAsync,
     isMutating: saveSettingsMutation.isPending
