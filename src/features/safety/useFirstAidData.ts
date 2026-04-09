@@ -1,12 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { firstAidCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 export const useFirstAidData = () => {
   const queryClient = useQueryClient();
 
   const { data: firstAidLogs = [], isLoading } = useLiveQuery<any[]>({
     queryKey: ['first_aid_logs'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('first_aid_logs').select('*');
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        return await firstAidCollection.getAll();
+      }
+    }
   });
 
   const addLogMutation = useMutation({

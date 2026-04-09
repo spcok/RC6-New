@@ -1,17 +1,25 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { movementsCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 import { InternalMovement } from '../../types';
 
 export const useMovementsData = () => {
   const queryClient = useQueryClient();
 
-  // 1. FETCH DATA (Reactive UI via TanStack DB Vault)
   const { data: movements = [], isLoading } = useLiveQuery<InternalMovement[]>({
     queryKey: ['movements'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('movements').select('*');
+        if (error) throw error;
+        return data as InternalMovement[];
+      } catch (err) {
+        return await movementsCollection.getAll();
+      }
+    }
   });
 
-  // 2. REMOTE MUTATIONS (Routed strictly through Offline Failover Vault)
   const addMovementMutation = useMutation({
     mutationFn: async (movement: Partial<InternalMovement>) => {
       const payload: InternalMovement = {

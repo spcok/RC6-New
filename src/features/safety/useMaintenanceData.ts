@@ -1,12 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { maintenanceCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 export const useMaintenanceData = () => {
   const queryClient = useQueryClient();
 
   const { data: maintenanceLogs = [], isLoading } = useLiveQuery<any[]>({
     queryKey: ['maintenance_logs'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('maintenance_logs').select('*');
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        return await maintenanceCollection.getAll();
+      }
+    }
   });
 
   const addLogMutation = useMutation({

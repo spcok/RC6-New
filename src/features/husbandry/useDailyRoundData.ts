@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { AnimalCategory, DailyRound, LogType } from '../../types';
+import { AnimalCategory, DailyRound, LogType, Animal, LogEntry } from '../../types';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 interface AnimalCheckState {
     isAlive?: boolean;
@@ -15,16 +16,44 @@ interface AnimalCheckState {
 export function useDailyRoundData(viewDate: string) {
     const queryClient = useQueryClient();
 
-    // 1. REACTIVE UI: Watch the local IndexedDB vault instantly via useLiveQuery
-    // Query keys must match the exact table names defined in database.ts
-    const { data: allAnimals = [], isLoading: isLoadingAnimals } = useLiveQuery({
-        queryKey: ['animals']
+    // 1. REACTIVE UI with Circuit Breaker Hydration
+    const { data: allAnimals = [], isLoading: isLoadingAnimals } = useLiveQuery<Animal[]>({
+        queryKey: ['animals'],
+        queryFn: async () => {
+            try {
+                const { data, error } = await supabase.from('animals').select('*');
+                if (error) throw error;
+                return data as Animal[];
+            } catch (err) {
+                return await animalsCollection.getAll();
+            }
+        }
     });
-    const { data: liveLogs = [], isLoading: isLoadingLogs } = useLiveQuery({
-        queryKey: ['daily_logs']
+
+    const { data: liveLogs = [], isLoading: isLoadingLogs } = useLiveQuery<LogEntry[]>({
+        queryKey: ['daily_logs'],
+        queryFn: async () => {
+            try {
+                const { data, error } = await supabase.from('daily_logs').select('*');
+                if (error) throw error;
+                return data as LogEntry[];
+            } catch (err) {
+                return await dailyLogsCollection.getAll();
+            }
+        }
     });
-    const { data: liveRounds = [], isLoading: isLoadingRounds } = useLiveQuery({
-        queryKey: ['daily_rounds']
+
+    const { data: liveRounds = [], isLoading: isLoadingRounds } = useLiveQuery<DailyRound[]>({
+        queryKey: ['daily_rounds'],
+        queryFn: async () => {
+            try {
+                const { data, error } = await supabase.from('daily_rounds').select('*');
+                if (error) throw error;
+                return data as DailyRound[];
+            } catch (err) {
+                return await dailyRoundsCollection.getAll();
+            }
+        }
     });
     
     const isLoading = isLoadingAnimals || isLoadingLogs || isLoadingRounds;
@@ -99,7 +128,7 @@ export function useDailyRoundData(viewDate: string) {
     const isComplete = totalAnimals > 0 && completedChecks === totalAnimals;
     const isNoteRequired = useMemo(() => false, []);
 
-    // 2. REMOTE MUTATION: Wrap sign-off in TanStack Query to track state, push to Failover Vault
+    // 2. REMOTE MUTATION
     const signOffMutation = useMutation({
         mutationFn: async (roundData: DailyRound) => {
             await dailyRoundsCollection.insert(roundData);
@@ -149,7 +178,7 @@ export function useDailyRoundData(viewDate: string) {
         setSigningInitials, 
         generalNotes, 
         setGeneralNotes, 
-        isSubmitting: signOffMutation.isPending, // Maps natively to the UI's loading spinner
+        isSubmitting: signOffMutation.isPending, 
         isPastRound, 
         toggleWater, 
         toggleSecure, 

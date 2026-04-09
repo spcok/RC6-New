@@ -1,13 +1,22 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLiveQuery } from '@tanstack/react-db';
 import { timesheetsCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 export const useTimesheetData = (staffName?: string) => {
   const queryClient = useQueryClient();
 
-  // FIX: Swapped useLiveQuery for stable useQuery hitting the local failover vault
-  const { data: timesheets = [], isLoading } = useQuery<any[]>({
+  const { data: timesheets = [], isLoading } = useLiveQuery<any[]>({
     queryKey: ['timesheets'],
-    queryFn: async () => await timesheetsCollection.getAll()
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('timesheets').select('*');
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        return await timesheetsCollection.getAll();
+      }
+    }
   });
 
   const filteredTimesheets = timesheets.filter(t => !t.isDeleted && (!staffName || t.staffName === staffName));

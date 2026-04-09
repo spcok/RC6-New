@@ -1,17 +1,26 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 import { Animal } from '../../types';
 
 export const useAnimalsData = () => {
   const queryClient = useQueryClient();
 
-  // 1. FETCH DATA (Reactive UI via TanStack DB Vault)
   const { data: animals = [], isLoading } = useLiveQuery<Animal[]>({
     queryKey: ['animals'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('animals').select('*');
+        if (error) throw error;
+        return data as Animal[];
+      } catch (err) {
+        console.warn('Network unreachable: Failing over to local vault for animals');
+        return await animalsCollection.getAll();
+      }
+    }
   });
 
-  // 2. REMOTE MUTATIONS (Routed strictly through Offline Failover Vault)
   const addAnimalMutation = useMutation({
     mutationFn: async (animal: Omit<Animal, 'id'>) => {
       const newAnimal = { 

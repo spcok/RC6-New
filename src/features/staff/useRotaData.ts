@@ -1,12 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { rotaCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 export const useRotaData = () => {
   const queryClient = useQueryClient();
 
   const { data: shifts = [], isLoading } = useLiveQuery<any[]>({
     queryKey: ['staff_rota'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('staff_rota').select('*');
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        return await rotaCollection.getAll();
+      }
+    }
   });
 
   const addShiftMutation = useMutation({

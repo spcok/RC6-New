@@ -1,12 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { holidaysCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 export const useHolidayData = () => {
   const queryClient = useQueryClient();
 
   const { data: holidays = [], isLoading } = useLiveQuery<any[]>({
     queryKey: ['holidays'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('holidays').select('*');
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        return await holidaysCollection.getAll();
+      }
+    }
   });
 
   const addHolidayMutation = useMutation({

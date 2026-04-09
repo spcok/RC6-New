@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { getUKLocalDate } from '../../services/temporalService';
 import { dailyLogsCollection } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 import { LogEntry, LogType, AnimalCategory } from '../../types';
 import { useAnimalsData } from '../animals/useAnimalsData';
 
@@ -10,10 +11,19 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
   const { animals, isLoading: animalsLoading } = useAnimalsData();
   const queryClient = useQueryClient();
 
-  // 1. FETCH LOGS (Reactive UI via TanStack DB Vault)
-  // Replaced direct Supabase useQuery with useLiveQuery to watch IndexedDB instantly
+  // THE MASTER ARCHITECTURE: Reactive UI + Online-First + Offline Failover
   const { data: logs = [], isLoading: logsLoading } = useLiveQuery<LogEntry[]>({
     queryKey: ['daily_logs'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.from('daily_logs').select('*');
+        if (error) throw error;
+        return data as LogEntry[];
+      } catch (err) {
+        console.warn('Network unreachable: Failing over to local 14-day vault for daily_logs');
+        return await dailyLogsCollection.getAll();
+      }
+    }
   });
   
   const dailyLogs = useMemo(() => {
@@ -30,8 +40,6 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
     return logs.find(log => log.animalId === animalId && log.logType === type && log.logDate === targetDate);
   };
 
-  // 2. REMOTE MUTATIONS (Routed strictly through Offline Failover Vault)
-  // Stripped out all direct supabase.from() calls. The database.ts handlers now manage the cloud push and offline retry queue.
   const addLogEntryMutation = useMutation({
     mutationFn: async (entry: Partial<LogEntry>) => {
       const newEntry: LogEntry = {
@@ -56,7 +64,6 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
 
   const deleteLogEntryMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Uses the collection.delete method to securely enforce the soft-delete pattern
       await dailyLogsCollection.delete(id);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['daily_logs'] })
