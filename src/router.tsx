@@ -1,4 +1,5 @@
 import { createRouter, createRoute, createRootRouteWithContext, redirect, Outlet } from '@tanstack/react-router';
+import { queryClient } from './lib/queryClient';
 import { AuthGuard } from './components/auth/AuthGuard';
 import Layout from './components/layout/Layout';
 import LoginScreen from './features/auth/LoginScreen';
@@ -43,6 +44,7 @@ import { UserPermissions } from './types';
 
 export interface RouterAuthContext {
   auth: { isAuthenticated: boolean; permissions?: Partial<UserPermissions> };
+  queryClient: typeof queryClient;
 }
 
 const rootRoute = createRootRouteWithContext<RouterAuthContext>()({
@@ -80,6 +82,13 @@ const dashboardRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/dashboard',
   component: DashboardContainer,
+  loader: async () => {
+    await Promise.all([
+      queryClient.ensureQueryData({ queryKey: ['animals'] }),
+      queryClient.ensureQueryData({ queryKey: ['daily_logs'] }),
+      queryClient.ensureQueryData({ queryKey: ['tasks'] })
+    ]);
+  }
 });
 
 // Animals
@@ -92,6 +101,9 @@ const animalsIndexRoute = createRoute({
   getParentRoute: () => animalsRoute,
   path: '/',
   component: AnimalsList,
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['animals'] });
+  }
 });
 
 const animalProfileRoute = createRoute({
@@ -114,6 +126,9 @@ const dailyLogRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['daily_logs'] });
+  },
   component: DailyLog,
 });
 
@@ -125,6 +140,9 @@ const dailyRoundsRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['daily_rounds'] });
+  },
   component: DailyRounds,
 });
 
@@ -135,6 +153,9 @@ const tasksRoute = createRoute({
     if (!context.auth.permissions?.tasks) {
       throw redirect({ to: '/dashboard' });
     }
+  },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['tasks'] });
   },
   component: Tasks,
 });
@@ -154,6 +175,9 @@ const medicalRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['medical_logs'] });
+  },
   component: MedicalRecords,
 });
 
@@ -165,6 +189,9 @@ const medicationsRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['mar_charts'] });
+  },
   component: MarCharts,
 });
 
@@ -175,6 +202,9 @@ const quarantineRoute = createRoute({
     if (!context.auth.permissions?.viewQuarantine) {
       throw redirect({ to: '/dashboard' });
     }
+  },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['quarantine_records'] });
   },
   component: QuarantineRecords,
 });
@@ -192,6 +222,9 @@ const movementsRoute = createRoute({
     if (!context.auth.permissions?.movements) {
       throw redirect({ to: '/dashboard' });
     }
+  },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['movements'] });
   },
   component: Movements,
 });
@@ -211,6 +244,9 @@ const staffRoute = createRoute({
 const rotaRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: '/staff-rota',
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['staff_rota'] });
+  },
   component: StaffRota,
 });
 
@@ -222,6 +258,9 @@ const timesheetsRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['timesheets'] });
+  },
   component: Timesheets,
 });
 
@@ -232,6 +271,9 @@ const holidaysRoute = createRoute({
     if (!context.auth.permissions?.holidayApprover && !context.auth.permissions?.attendance) {
       throw redirect({ to: '/dashboard' });
     }
+  },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['holidays'] });
   },
   component: Holidays,
 });
@@ -285,6 +327,9 @@ const maintenanceRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['maintenance_logs'] });
+  },
   component: SiteMaintenance,
 });
 
@@ -295,6 +340,9 @@ const incidentsRoute = createRoute({
     if (!context.auth.permissions?.safety) {
       throw redirect({ to: '/dashboard' });
     }
+  },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['incidents'] });
   },
   component: Incidents,
 });
@@ -307,6 +355,9 @@ const firstAidRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['first_aid_logs'] });
+  },
   component: FirstAid,
 });
 
@@ -317,6 +368,9 @@ const drillsRoute = createRoute({
     if (!context.auth.permissions?.safety) {
       throw redirect({ to: '/dashboard' });
     }
+  },
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['safety_drills'] });
   },
   component: SafetyDrills,
 });
@@ -345,12 +399,18 @@ const settingsIndexRoute = createRoute({
 const settingsOrgRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/organization',
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['organisations'] });
+  },
   component: OrgProfile,
 });
 
 const settingsDirectoryRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/directory',
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['directory_contacts'] });
+  },
   component: Directory,
 });
 
@@ -375,6 +435,9 @@ const settingsAccessRoute = createRoute({
 const settingsZlaRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/zla',
+  loader: async () => {
+    await queryClient.ensureQueryData({ queryKey: ['zla_documents'] });
+  },
   component: ZLADocuments,
 });
 
@@ -448,6 +511,11 @@ const routeTree = rootRoute.addChildren([
 
 export const router = createRouter({
   routeTree,
+  context: {
+    queryClient,
+    auth: undefined!, // This will be set in the provider
+  },
+  defaultPreload: 'intent',
   defaultNotFoundComponent: () => <div className="p-8 text-center text-slate-500 font-bold">404 - Page Not Found</div>
 });
 
