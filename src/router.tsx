@@ -60,7 +60,6 @@ const authRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
   beforeLoad: async () => {
-    // 1. THE GATE: Block routing until Supabase Auth is ready.
     await supabase.auth.getSession();
   },
   component: () => (
@@ -82,14 +81,10 @@ const dashboardRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/dashboard',
   component: DashboardContainer,
-  loader: async () => {
-    // 2. THE FETCH: Trigger the data sync safely AFTER the gate is open.
-    // prefetchQuery silently ignores offline network failures, preventing route crashes.
-    await Promise.all([
-      queryClient.prefetchQuery({ queryKey: ['animals'] }),
-      queryClient.prefetchQuery({ queryKey: ['daily_logs'] }),
-      queryClient.prefetchQuery({ queryKey: ['tasks'] })
-    ]);
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['animals'] });
+    queryClient.prefetchQuery({ queryKey: ['daily_logs'] });
+    queryClient.prefetchQuery({ queryKey: ['tasks'] });
   }
 });
 
@@ -102,8 +97,8 @@ const animalsIndexRoute = createRoute({
   getParentRoute: () => animalsRoute,
   path: '/',
   component: AnimalsList,
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['animals'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['animals'] });
   }
 });
 
@@ -124,8 +119,9 @@ const dailyLogRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.dailyLog) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['daily_logs'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['daily_logs'] });
+    queryClient.prefetchQuery({ queryKey: ['animals'] });
   },
   component: DailyLog,
 });
@@ -136,8 +132,9 @@ const dailyRoundsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.rounds) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['daily_rounds'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['daily_rounds'] });
+    queryClient.prefetchQuery({ queryKey: ['animals'] });
   },
   component: DailyRounds,
 });
@@ -148,8 +145,8 @@ const tasksRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.tasks) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['tasks'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['tasks'] });
   },
   component: Tasks,
 });
@@ -166,8 +163,9 @@ const medicalRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.medical) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['medical_logs'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['medical_logs'] });
+    queryClient.prefetchQuery({ queryKey: ['animals'] });
   },
   component: MedicalRecords,
 });
@@ -178,8 +176,8 @@ const medicationsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.viewMedications) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['mar_charts'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['mar_charts'] });
   },
   component: MarCharts,
 });
@@ -190,8 +188,8 @@ const quarantineRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.viewQuarantine) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['quarantine_records'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['quarantine_records'] });
   },
   component: QuarantineRecords,
 });
@@ -207,8 +205,9 @@ const movementsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.movements) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['movements'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['internal_movements'] });
+    queryClient.prefetchQuery({ queryKey: ['animals'] });
   },
   component: Movements,
 });
@@ -216,6 +215,9 @@ const movementsRoute = createRoute({
 const flightsRoute = createRoute({
   getParentRoute: () => logisticsRoute,
   path: '/flights',
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['external_transfers'] });
+  },
   component: FlightRecords,
 });
 
@@ -227,8 +229,8 @@ const staffRoute = createRoute({
 const rotaRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: '/staff-rota',
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['staff_rota'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['staff_rota'] });
   },
   component: StaffRota,
 });
@@ -239,8 +241,8 @@ const timesheetsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.attendance) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['timesheets'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['timesheets'] });
   },
   component: Timesheets,
 });
@@ -253,8 +255,8 @@ const holidaysRoute = createRoute({
       throw redirect({ to: '/dashboard' });
     }
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['holidays'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['holidays'] });
   },
   component: Holidays,
 });
@@ -299,8 +301,8 @@ const maintenanceRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.maintenance) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['maintenance_logs'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['maintenance_logs'] });
   },
   component: SiteMaintenance,
 });
@@ -311,8 +313,8 @@ const incidentsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.safety) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['incidents'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['incidents'] });
   },
   component: Incidents,
 });
@@ -323,8 +325,8 @@ const firstAidRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.safety) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['first_aid_logs'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['first_aid_logs'] });
   },
   component: FirstAid,
 });
@@ -335,8 +337,8 @@ const drillsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.safety) throw redirect({ to: '/dashboard' });
   },
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['safety_drills'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['safety_drills'] });
   },
   component: SafetyDrills,
 });
@@ -361,8 +363,8 @@ const settingsIndexRoute = createRoute({
 const settingsOrgRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/organization',
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['organisations'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['organisations'] });
   },
   component: OrgProfile,
 });
@@ -370,8 +372,8 @@ const settingsOrgRoute = createRoute({
 const settingsDirectoryRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/directory',
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['directory_contacts'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['directory_contacts'] });
   },
   component: Directory,
 });
@@ -397,8 +399,8 @@ const settingsAccessRoute = createRoute({
 const settingsZlaRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/zla',
-  loader: async () => {
-    await queryClient.prefetchQuery({ queryKey: ['zla_documents'] });
+  loader: () => {
+    queryClient.prefetchQuery({ queryKey: ['zla_documents'] });
   },
   component: ZLADocuments,
 });

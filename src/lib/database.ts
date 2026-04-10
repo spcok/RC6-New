@@ -10,7 +10,6 @@ import {
   MaintenanceLog, FirstAidLog, UserProfile, MARChart, QuarantineRecord
 } from '../types';
 
-// --- 1. GLOBAL SNAKE CASE TRANSLATOR ---
 const toSnakeCase = (str: string) => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
 const mapToSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> => {
@@ -26,6 +25,7 @@ const mapToSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> =
 
 interface CollectionOptions {
   hasSoftDelete?: boolean;
+  dateFilterColumn?: string;
 }
 
 const createFailoverCollection = <T extends { id: string | number }>(
@@ -37,15 +37,20 @@ const createFailoverCollection = <T extends { id: string | number }>(
       queryClient,
       queryKey: [tableName],
       queryFn: async () => {
-        // OFFICIAL PATTERN: Throwing standard network errors delegates 
-        // fallback responsibility to TanStack Query's native offline queue.
-        if (!navigator.onLine) {
-          throw new Error('Offline');
-        }
+        if (!navigator.onLine) throw new Error('Offline');
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Auth_Pending');
         
         let query = supabase.from(tableName).select('*');
         if (options.hasSoftDelete) {
           query = query.eq('is_deleted', false);
+        }
+        
+        if (options.dateFilterColumn) {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          query = query.gte(options.dateFilterColumn, thirtyDaysAgo.toISOString());
         }
           
         const { data, error } = await query;
@@ -60,10 +65,8 @@ const createFailoverCollection = <T extends { id: string | number }>(
       syncMode: 'eager',
       startSync: true,
       
-      // --- 2. THE CHOKE POINT: TRANSLATING BEFORE QUEUEING ---
       onInsert: async ({ transaction }) => {
         const items = transaction.mutations.map(m => mapToSnakeCase(m.modified));
-        
         queryClient.getMutationCache().build(queryClient, {
           mutationFn: async () => {
             const { error } = await supabase.from(tableName).insert(items);
@@ -89,7 +92,6 @@ const createFailoverCollection = <T extends { id: string | number }>(
       
       onDelete: async ({ transaction }) => {
         const keys = transaction.mutations.map(m => m.key);
-        
         queryClient.getMutationCache().build(queryClient, {
           mutationFn: async () => {
             if (options.hasSoftDelete) {
@@ -106,8 +108,6 @@ const createFailoverCollection = <T extends { id: string | number }>(
     })
   ) as any;
 
-  // --- 3. INSTANCE PATCH: SATISFY THE NATIVE HANDSHAKE ---
-  // Route the offline observer directly to the TanStack Query cache in RAM
   collection.getOfflineData = async () => {
     return queryClient.getQueryData([tableName]) || [];
   };
@@ -115,25 +115,28 @@ const createFailoverCollection = <T extends { id: string | number }>(
   return collection;
 };
 
-// --- NATIVE COLLECTION EXPORTS ---
+// MASTER TABLE MAP (Aligned to Supabase perfectly)
 export const animalsCollection = createFailoverCollection<Animal>('animals');
-export const dailyLogsCollection = createFailoverCollection<LogEntry>('daily_logs');
-export const dailyRoundsCollection = createFailoverCollection<DailyRound>('daily_rounds');
-export const tasksCollection = createFailoverCollection<Task>('tasks');
 export const usersCollection = createFailoverCollection<UserProfile>('users');
 
 export const orgSettingsCollection = createFailoverCollection<OrganizationSettings>('organisations', { hasSoftDelete: false });
 export const zlaDocumentsCollection = createFailoverCollection<ZlaDocument>('zla_documents', { hasSoftDelete: false });
 export const directoryCollection = createFailoverCollection<DirectoryEntry>('directory_contacts', { hasSoftDelete: false });
-export const transfersCollection = createFailoverCollection<Transfer>('external_transfers', { hasSoftDelete: false });
 
-export const medicalLogsCollection = createFailoverCollection<ClinicalNote>('medical_logs');
+export const dailyLogsCollection = createFailoverCollection<LogEntry>('daily_logs', { hasSoftDelete: true, dateFilterColumn: 'log_date' });
+export const dailyRoundsCollection = createFailoverCollection<DailyRound>('daily_rounds', { hasSoftDelete: true, dateFilterColumn: 'date' });
+export const tasksCollection = createFailoverCollection<Task>('tasks', { hasSoftDelete: true, dateFilterColumn: 'due_date' });
+export const medicalLogsCollection = createFailoverCollection<ClinicalNote>('medical_logs', { hasSoftDelete: true, dateFilterColumn: 'date' });
 export const marChartsCollection = createFailoverCollection<MARChart>('mar_charts');
 export const quarantineRecordsCollection = createFailoverCollection<QuarantineRecord>('quarantine_records');
-export const movementsCollection = createFailoverCollection<Movement>('movements');
-export const timesheetsCollection = createFailoverCollection<Timesheet>('timesheets');
+
+export const movementsCollection = createFailoverCollection<Movement>('internal_movements', { hasSoftDelete: true, dateFilterColumn: 'log_date' });
+export const transfersCollection = createFailoverCollection<Transfer>('external_transfers', { hasSoftDelete: false });
+
+export const timesheetsCollection = createFailoverCollection<Timesheet>('timesheets', { hasSoftDelete: true, dateFilterColumn: 'date' });
 export const rotaCollection = createFailoverCollection<RotaShift>('staff_rota');
 export const holidaysCollection = createFailoverCollection<Holiday>('holidays');
+
 export const safetyDrillsCollection = createFailoverCollection<SafetyDrill>('safety_drills');
 export const incidentsCollection = createFailoverCollection<Incident>('incidents');
 export const maintenanceCollection = createFailoverCollection<MaintenanceLog>('maintenance_logs');
