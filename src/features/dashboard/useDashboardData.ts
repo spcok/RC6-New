@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection, dailyLogsCollection, tasksCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
 import { Animal, AnimalCategory, LogType, LogEntry, Task, DailyLog } from '../../types';
-import { mapToCamelCase } from '../../lib/dataMapping';
 
 export interface EnhancedAnimal extends Animal {
   todayWeight?: LogEntry;
@@ -27,42 +25,18 @@ export interface PendingTask {
 
 export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDate: string) {
   
-  // 1. Fetch Animals using the .live() handshake
-  const { data: rawAnimals = [], isLoading: animalsLoading } = useLiveQuery<Animal[]>({
-    queryKey: ['animals'],
-    queryFn: async () => {
-      // THE FIX: This handshake prevents the _getQuery error
-      return animalsCollection.live(async () => {
-        const { data, error } = await supabase.from('animals').select('*');
-        if (error) throw error;
-        return mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
-      });
-    }
-  });
+  // 1. Native Reactive Observes (Satisfies _getQuery)
+  const { data: rawAnimals = [], isLoading: animalsLoading } = useLiveQuery((q) => 
+    q.from({ item: animalsCollection })
+  );
 
-  // 2. Fetch Logs using the .live() handshake
-  const { data: rawLogs = [], isLoading: logsLoading } = useLiveQuery<DailyLog[]>({
-    queryKey: ['daily_logs'],
-    queryFn: async () => {
-      return dailyLogsCollection.live(async () => {
-        const { data, error } = await supabase.from('daily_logs').select('*');
-        if (error) throw error;
-        return mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
-      });
-    }
-  });
+  const { data: rawLogs = [], isLoading: logsLoading } = useLiveQuery((q) => 
+    q.from({ item: dailyLogsCollection })
+  );
 
-  // 3. Fetch Tasks using the .live() handshake
-  const { data: rawTasks = [], isLoading: tasksLoading } = useLiveQuery<Task[]>({
-    queryKey: ['tasks'],
-    queryFn: async () => {
-      return tasksCollection.live(async () => {
-        const { data, error } = await supabase.from('tasks').select('*');
-        if (error) throw error;
-        return mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
-      });
-    }
-  });
+  const { data: rawTasks = [], isLoading: tasksLoading } = useLiveQuery((q) => 
+    q.from({ item: tasksCollection })
+  );
 
   const isLoading = animalsLoading || logsLoading || tasksLoading;
 
