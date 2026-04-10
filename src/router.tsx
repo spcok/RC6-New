@@ -1,6 +1,5 @@
 import { createRouter, createRoute, createRootRouteWithContext, redirect, Outlet } from '@tanstack/react-router';
 import { queryClient } from './lib/queryClient';
-import { supabase } from './lib/supabase';
 import { AuthGuard } from './components/auth/AuthGuard';
 import Layout from './components/layout/Layout';
 import LoginScreen from './features/auth/LoginScreen';
@@ -59,8 +58,12 @@ const loginRoute = createRoute({
 const authRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
-  beforeLoad: async () => {
-    await supabase.auth.getSession();
+  beforeLoad: ({ context }) => {
+    // 0ms SYNCHRONOUS CHECK: Zustand already validated this on app boot.
+    // No more redundant network/disk await delays during navigation!
+    if (!context.auth.isAuthenticated) {
+      throw redirect({ to: '/login' });
+    }
   },
   component: () => (
     <AuthGuard>
@@ -81,11 +84,6 @@ const dashboardRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/dashboard',
   component: DashboardContainer,
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['animals'] });
-    queryClient.prefetchQuery({ queryKey: ['daily_logs'] });
-    queryClient.prefetchQuery({ queryKey: ['tasks'] });
-  }
 });
 
 const animalsRoute = createRoute({
@@ -97,9 +95,6 @@ const animalsIndexRoute = createRoute({
   getParentRoute: () => animalsRoute,
   path: '/',
   component: AnimalsList,
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['animals'] });
-  }
 });
 
 const animalProfileRoute = createRoute({
@@ -119,10 +114,6 @@ const dailyLogRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.dailyLog) throw redirect({ to: '/dashboard' });
   },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['daily_logs'] });
-    queryClient.prefetchQuery({ queryKey: ['animals'] });
-  },
   component: DailyLog,
 });
 
@@ -132,10 +123,6 @@ const dailyRoundsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.rounds) throw redirect({ to: '/dashboard' });
   },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['daily_rounds'] });
-    queryClient.prefetchQuery({ queryKey: ['animals'] });
-  },
   component: DailyRounds,
 });
 
@@ -144,9 +131,6 @@ const tasksRoute = createRoute({
   path: '/tasks',
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.tasks) throw redirect({ to: '/dashboard' });
-  },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['tasks'] });
   },
   component: Tasks,
 });
@@ -163,10 +147,6 @@ const medicalRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.medical) throw redirect({ to: '/dashboard' });
   },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['medical_logs'] });
-    queryClient.prefetchQuery({ queryKey: ['animals'] });
-  },
   component: MedicalRecords,
 });
 
@@ -176,9 +156,6 @@ const medicationsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.viewMedications) throw redirect({ to: '/dashboard' });
   },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['mar_charts'] });
-  },
   component: MarCharts,
 });
 
@@ -187,9 +164,6 @@ const quarantineRoute = createRoute({
   path: '/quarantine',
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.viewQuarantine) throw redirect({ to: '/dashboard' });
-  },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['quarantine_records'] });
   },
   component: QuarantineRecords,
 });
@@ -205,19 +179,12 @@ const movementsRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.movements) throw redirect({ to: '/dashboard' });
   },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['internal_movements'] });
-    queryClient.prefetchQuery({ queryKey: ['animals'] });
-  },
   component: Movements,
 });
 
 const flightsRoute = createRoute({
   getParentRoute: () => logisticsRoute,
   path: '/flights',
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['external_transfers'] });
-  },
   component: FlightRecords,
 });
 
@@ -229,9 +196,6 @@ const staffRoute = createRoute({
 const rotaRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: '/staff-rota',
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['staff_rota'] });
-  },
   component: StaffRota,
 });
 
@@ -240,9 +204,6 @@ const timesheetsRoute = createRoute({
   path: '/staff-timesheets',
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.attendance) throw redirect({ to: '/dashboard' });
-  },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['timesheets'] });
   },
   component: Timesheets,
 });
@@ -254,9 +215,6 @@ const holidaysRoute = createRoute({
     if (!context.auth.permissions?.holidayApprover && !context.auth.permissions?.attendance) {
       throw redirect({ to: '/dashboard' });
     }
-  },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['holidays'] });
   },
   component: Holidays,
 });
@@ -301,9 +259,6 @@ const maintenanceRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.maintenance) throw redirect({ to: '/dashboard' });
   },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['maintenance_logs'] });
-  },
   component: SiteMaintenance,
 });
 
@@ -312,9 +267,6 @@ const incidentsRoute = createRoute({
   path: '/incidents',
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.safety) throw redirect({ to: '/dashboard' });
-  },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['incidents'] });
   },
   component: Incidents,
 });
@@ -325,9 +277,6 @@ const firstAidRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.safety) throw redirect({ to: '/dashboard' });
   },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['first_aid_logs'] });
-  },
   component: FirstAid,
 });
 
@@ -336,9 +285,6 @@ const drillsRoute = createRoute({
   path: '/safety-drills',
   beforeLoad: ({ context }) => {
     if (!context.auth.permissions?.safety) throw redirect({ to: '/dashboard' });
-  },
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['safety_drills'] });
   },
   component: SafetyDrills,
 });
@@ -363,18 +309,12 @@ const settingsIndexRoute = createRoute({
 const settingsOrgRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/organization',
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['organisations'] });
-  },
   component: OrgProfile,
 });
 
 const settingsDirectoryRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/directory',
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['directory_contacts'] });
-  },
   component: Directory,
 });
 
@@ -399,9 +339,6 @@ const settingsAccessRoute = createRoute({
 const settingsZlaRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/zla',
-  loader: () => {
-    queryClient.prefetchQuery({ queryKey: ['zla_documents'] });
-  },
   component: ZLADocuments,
 });
 

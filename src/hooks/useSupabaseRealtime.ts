@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
+import { mapToCamelCase } from '../lib/dataMapping';
 
 export function useSupabaseRealtime() {
   useEffect(() => {
-    // 1. Create a single WebSocket connection for the entire database
     const channel = supabase
       .channel('global-db-changes')
       .on(
@@ -13,23 +13,30 @@ export function useSupabaseRealtime() {
         (payload) => {
           const tableName = payload.table;
           
-          console.log(`[Realtime] ${payload.eventType} detected on ${tableName}. Invalidating local cache...`);
-          
-          // 2. Tell TanStack to instantly fetch the new data in the background
-          queryClient.invalidateQueries({ 
-            queryKey: [tableName],
-            // EXACT Match ensures we don't accidentally invalidate nested/unrelated queries
-            exact: true 
-          });
+          // SURGICAL CACHE INJECTION: No network refetch required!
+          if (payload.eventType === 'INSERT') {
+            const newItem = mapToCamelCase(payload.new);
+            queryClient.setQueryData([tableName], (oldData: unknown[] | undefined) => {
+              return oldData ? [...oldData, newItem] : [newItem];
+            });
+          } 
+          else if (payload.eventType === 'UPDATE') {
+            const updatedItem = mapToCamelCase(payload.new as Record<string, unknown>);
+            queryClient.setQueryData([tableName], (oldData: unknown[] | undefined) => {
+              if (!oldData) return [updatedItem];
+              return oldData.map((item: any) => item.id === updatedItem.id ? updatedItem : item);
+            });
+          } 
+          else if (payload.eventType === 'DELETE') {
+            queryClient.setQueryData([tableName], (oldData: unknown[] | undefined) => {
+              if (!oldData) return [];
+              return oldData.filter((item: any) => item.id !== payload.old.id);
+            });
+          }
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] WebSocket connected. Listening for cloud syncs.');
-        }
-      });
+      .subscribe();
 
-    // 3. Cleanup the socket if the app unmounts
     return () => {
       supabase.removeChannel(channel);
     };
