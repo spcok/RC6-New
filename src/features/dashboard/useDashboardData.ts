@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection, dailyLogsCollection, tasksCollection } from '../../lib/database';
-import { Animal, AnimalCategory, LogType, LogEntry, Task, DailyLog } from '../../types';
+import { Animal, AnimalCategory, LogType, LogEntry } from '../../types';
 
 export interface EnhancedAnimal extends Animal {
   todayWeight?: LogEntry;
