@@ -1,51 +1,30 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { holidaysCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
+import { Holiday } from '../../types';
 
 export const useHolidayData = () => {
-  const queryClient = useQueryClient();
+  const { data, isLoading } = useLiveQuery((q) => 
+    q.from({ item: holidaysCollection })
+  );
 
-  const { data: holidays = [], isLoading } = useLiveQuery<any[]>({
-    queryKey: ['holidays'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from('holidays').select('*');
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        return await holidaysCollection.getAll();
-      }
-    }
-  });
-
-  const addHolidayMutation = useMutation({
-    mutationFn: async (holiday: any) => {
-      const newHoliday = { ...holiday, id: holiday.id || crypto.randomUUID(), isDeleted: false };
-      await holidaysCollection.insert(newHoliday);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
-  });
-
-  const updateHolidayMutation = useMutation({
-    mutationFn: async (holiday: any) => {
-      await holidaysCollection.update(holiday.id, holiday);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
-  });
-
-  const deleteHolidayMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await holidaysCollection.delete(id);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['holidays'] })
-  });
+  const safeData = Array.isArray(data) ? data : [];
+  const activeHolidays = safeData.filter((h: Holiday) => h && !h.isDeleted);
 
   return {
-    holidays: holidays.filter(h => !h.isDeleted),
+    // Aliases
+    holidays: activeHolidays,
+    requests: activeHolidays,
+    data: activeHolidays,
+
     isLoading,
-    addHoliday: addHolidayMutation.mutateAsync,
-    updateHoliday: updateHolidayMutation.mutateAsync,
-    deleteHoliday: deleteHolidayMutation.mutateAsync,
+    addHoliday: async (holiday: Partial<Holiday>) => {
+      await holidaysCollection.insert({ ...holiday, id: holiday.id || crypto.randomUUID(), isDeleted: false } as Holiday);
+    },
+    updateHoliday: async (id: string, updates: Partial<Holiday>) => {
+      await holidaysCollection.update(id, updates);
+    },
+    deleteHoliday: async (id: string) => {
+      await holidaysCollection.delete(id);
+    }
   };
 };

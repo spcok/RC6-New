@@ -1,20 +1,35 @@
 import { useLiveQuery } from '@tanstack/react-db';
 import { timesheetsCollection } from '../../lib/database';
+import { Timesheet } from '../../types';
 
 export const useTimesheetData = (staffName?: string) => {
-  // Official TanStack DB reactive selector
-  const { data: timesheets = [], isLoading } = useLiveQuery((q) => 
+  const { data, isLoading } = useLiveQuery((q) => 
     q.from({ item: timesheetsCollection })
   );
 
-  const filteredTimesheets = staffName 
-    ? timesheets.filter(t => !t.isDeleted && t.staffName === staffName)
-    : timesheets.filter(t => !t.isDeleted);
+  const safeData = Array.isArray(data) ? data : [];
+  
+  const activeTimesheets = safeData.filter((t: Timesheet) => {
+    if (!t || t.isDeleted) return false;
+    if (staffName && t.staffName !== staffName) return false;
+    return true;
+  });
 
   return {
-    timesheets: filteredTimesheets,
+    // Aliases to prevent destructuring crashes
+    timesheets: activeTimesheets,
+    logs: activeTimesheets,
+    data: activeTimesheets,
+    
     isLoading,
-    addTimesheet: (entry: any) => timesheetsCollection.insert(entry),
-    updateTimesheet: (id: string, entry: any) => timesheetsCollection.update(id, entry),
+    addTimesheet: async (entry: Partial<Timesheet>) => {
+      await timesheetsCollection.insert({ ...entry, id: entry.id || crypto.randomUUID(), isDeleted: false } as Timesheet);
+    },
+    updateTimesheet: async (id: string, updates: Partial<Timesheet>) => {
+      await timesheetsCollection.update(id, updates);
+    },
+    deleteTimesheet: async (id: string) => {
+      await timesheetsCollection.delete(id);
+    }
   };
 };

@@ -3,12 +3,19 @@ import { incidentsCollection } from '../../lib/database';
 import { Incident } from '../../types';
 
 export const useIncidentData = () => {
-  const { data: incidents = [], isLoading } = useLiveQuery((q) => 
+  const { data, isLoading } = useLiveQuery((q) => 
     q.from({ item: incidentsCollection })
   );
 
+  const safeData = Array.isArray(data) ? data : [];
+  const activeIncidents = safeData.filter((i: Incident) => i && !i.isDeleted);
+
   return {
-    incidents: incidents.filter((i: Incident) => !i.isDeleted),
+    // Aliases
+    incidents: activeIncidents,
+    logs: activeIncidents,
+    data: activeIncidents,
+    
     isLoading,
     addIncident: async (incident: Partial<Incident>) => {
       await incidentsCollection.insert({ ...incident, id: incident.id || crypto.randomUUID(), isDeleted: false } as Incident);

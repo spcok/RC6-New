@@ -3,12 +3,20 @@ import { safetyDrillsCollection } from '../../lib/database';
 import { SafetyDrill } from '../../types';
 
 export const useSafetyDrillData = () => {
-  const { data: drills = [], isLoading } = useLiveQuery((q) => 
+  const { data, isLoading } = useLiveQuery((q) => 
     q.from({ item: safetyDrillsCollection })
   );
 
+  const safeData = Array.isArray(data) ? data : [];
+  const activeDrills = safeData.filter((d: SafetyDrill) => d && !d.isDeleted);
+
   return {
-    drills: drills.filter((d: SafetyDrill) => !d.isDeleted),
+    // Aliases
+    drills: activeDrills,
+    safetyDrills: activeDrills,
+    logs: activeDrills,
+    data: activeDrills,
+    
     isLoading,
     addDrill: async (drill: Partial<SafetyDrill>) => {
       await safetyDrillsCollection.insert({ ...drill, id: drill.id || crypto.randomUUID(), isDeleted: false } as SafetyDrill);

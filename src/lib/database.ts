@@ -4,52 +4,50 @@ import { queryClient } from './queryClient';
 import { supabase } from './supabase';
 import { mapToCamelCase } from './dataMapping';
 import { 
-  Animal, 
-  LogEntry, 
-  Task, 
-  Timesheet, 
-  ClinicalNote, 
-  DailyRound,
-  OrganizationSettings,
-  ZlaDocument,
-  DirectoryEntry,
-  Movement,
-  Transfer,
-  RotaShift,
-  Holiday,
-  SafetyDrill,
-  Incident,
-  MaintenanceLog,
-  FirstAidLog
+  Animal, LogEntry, Task, Timesheet, ClinicalNote, DailyRound,
+  OrganizationSettings, ZlaDocument, DirectoryEntry, Movement,
+  Transfer, RotaShift, Holiday, SafetyDrill, Incident,
+  MaintenanceLog, FirstAidLog
 } from '../types';
 
-const createFailoverCollection = <T extends { id: string | number }>(tableName: string) => {
+interface CollectionOptions {
+  hasSoftDelete?: boolean;
+}
+
+const createFailoverCollection = <T extends { id: string | number }>(
+  tableName: string, 
+  options: CollectionOptions = { hasSoftDelete: true }
+) => {
   return createCollection(
     queryCollectionOptions({
       queryClient,
       queryKey: [tableName],
       queryFn: async () => {
-        try {
-          if (!navigator.onLine) throw new Error('Offline');
-          
-          const { data, error } = await supabase
-            .from(tableName)
-            .select('*')
-            .eq('is_deleted', false);
-            
-          if (error) throw error;
-          
-          return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item));
-        } catch (err) {
-          console.warn(`[Vault] Supabase unreachable for ${tableName}. Serving persistent cache.`);
-          return []; 
+        if (!navigator.onLine) {
+          throw new Error(`[Network] Offline. Preserving local vault for ${tableName}.`);
         }
+        
+        let query = supabase.from(tableName).select('*');
+        
+        // FIX: Only query 'is_deleted' if the table actually has that column
+        if (options.hasSoftDelete) {
+          query = query.eq('is_deleted', false);
+        }
+          
+        const { data, error } = await query;
+          
+        if (error) {
+          console.error(`[Supabase Error] ${tableName}:`, error);
+          throw error; 
+        }
+        
+        return (data as Record<string, unknown>[]).map(item => mapToCamelCase<T>(item));
       },
       getKey: (item) => item.id,
-      // SATISFYING THE HANDSHAKE: Required for offline observers in queryCollectionOptions
-      getOfflineData: async () => {
-        return [];
-      },
+      syncMode: 'eager',
+      startSync: true,
+      getOfflineData: async () => { return []; },
+      
       onInsert: async ({ transaction }) => {
         const items = transaction.mutations.map(m => m.modified);
         await supabase.from(tableName).insert(items);
@@ -61,25 +59,34 @@ const createFailoverCollection = <T extends { id: string | number }>(tableName: 
       },
       onDelete: async ({ transaction }) => {
         const keys = transaction.mutations.map(m => m.key);
-        await supabase.from(tableName).update({ is_deleted: true }).in('id', keys);
+        // FIX: Use hard delete if the table lacks an 'is_deleted' column
+        if (options.hasSoftDelete) {
+          await supabase.from(tableName).update({ is_deleted: true }).in('id', keys);
+        } else {
+          await supabase.from(tableName).delete().in('id', keys);
+        }
       }
     })
   );
 };
 
+// --- NATIVE COLLECTION EXPORTS ---
 export const animalsCollection = createFailoverCollection<Animal>('animals');
 export const dailyLogsCollection = createFailoverCollection<LogEntry>('daily_logs');
 export const dailyRoundsCollection = createFailoverCollection<DailyRound>('daily_rounds');
 export const tasksCollection = createFailoverCollection<Task>('tasks');
 export const usersCollection = createFailoverCollection<any>('users');
-export const orgSettingsCollection = createFailoverCollection<OrganizationSettings>('org_settings');
-export const zlaDocumentsCollection = createFailoverCollection<ZlaDocument>('zla_documents');
-export const directoryCollection = createFailoverCollection<DirectoryEntry>('directory');
+
+// FIX: Aligned explicitly to exact Supabase schema names and removed soft-delete expectation
+export const orgSettingsCollection = createFailoverCollection<OrganizationSettings>('organisations', { hasSoftDelete: false });
+export const zlaDocumentsCollection = createFailoverCollection<ZlaDocument>('zla_documents', { hasSoftDelete: false });
+export const directoryCollection = createFailoverCollection<DirectoryEntry>('directory_contacts', { hasSoftDelete: false });
+export const transfersCollection = createFailoverCollection<Transfer>('external_transfers', { hasSoftDelete: false });
+
 export const medicalLogsCollection = createFailoverCollection<ClinicalNote>('medical_logs');
 export const marChartsCollection = createFailoverCollection<any>('mar_charts');
 export const quarantineRecordsCollection = createFailoverCollection<any>('quarantine_records');
 export const movementsCollection = createFailoverCollection<Movement>('movements');
-export const transfersCollection = createFailoverCollection<Transfer>('external_transfers');
 export const timesheetsCollection = createFailoverCollection<Timesheet>('timesheets');
 export const rotaCollection = createFailoverCollection<RotaShift>('staff_rota');
 export const holidaysCollection = createFailoverCollection<Holiday>('holidays');
