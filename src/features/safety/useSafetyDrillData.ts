@@ -1,43 +1,23 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { safetyDrillsCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
+import { SafetyDrill } from '../../types';
 
 export const useSafetyDrillData = () => {
-  const queryClient = useQueryClient();
-
-  const { data: drills = [], isLoading } = useLiveQuery<any[]>({
-    queryKey: ['safety_drills'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from('safety_drills').select('*');
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        return await safetyDrillsCollection.getAll();
-      }
-    }
-  });
-
-  const addDrillMutation = useMutation({
-    mutationFn: async (drill: any) => {
-      const newDrill = { ...drill, id: drill.id || crypto.randomUUID(), isDeleted: false };
-      await safetyDrillsCollection.insert(newDrill);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['safety_drills'] })
-  });
-
-  const updateDrillMutation = useMutation({
-    mutationFn: async (drill: any) => {
-      await safetyDrillsCollection.update(drill.id, drill);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['safety_drills'] })
-  });
+  const { data: drills = [], isLoading } = useLiveQuery((q) => 
+    q.from({ item: safetyDrillsCollection })
+  );
 
   return {
-    drills: drills.filter(d => !d.isDeleted),
+    drills: drills.filter((d: SafetyDrill) => !d.isDeleted),
     isLoading,
-    addDrill: addDrillMutation.mutateAsync,
-    updateDrill: updateDrillMutation.mutateAsync,
+    addDrill: async (drill: Partial<SafetyDrill>) => {
+      await safetyDrillsCollection.insert({ ...drill, id: drill.id || crypto.randomUUID(), isDeleted: false } as SafetyDrill);
+    },
+    updateDrill: async (id: string, updates: Partial<SafetyDrill>) => {
+      await safetyDrillsCollection.update(id, updates);
+    },
+    deleteDrill: async (id: string) => {
+      await safetyDrillsCollection.delete(id);
+    }
   };
 };

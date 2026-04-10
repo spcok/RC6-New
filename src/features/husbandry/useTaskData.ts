@@ -1,76 +1,25 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
-import { Task } from '../../types';
 import { tasksCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
-import { mapToCamelCase } from '../../lib/dataMapping';
+import { Task } from '../../types';
 
 export const useTaskData = () => {
-  const queryClient = useQueryClient();
-
-  // Swapped to useLiveQuery with circuit breaker pattern
-  const { data: tasks = [], isLoading } = useLiveQuery<Task[]>({
-    queryKey: ['tasks'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from('tasks').select('*');
-        if (error) throw error;
-        
-        const camelCaseData = mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
-
-        return camelCaseData.map((item: Task): Task => ({
-          ...item,
-          id: item.id ?? crypto.randomUUID(),
-          title: item.title ?? "Untitled Task",
-          dueDate: item.dueDate ?? new Date().toISOString(),
-          completed: item.completed ?? false,
-          isDeleted: item.isDeleted ?? false,
-        }));
-      } catch {
-        console.warn("Network unreachable. Serving tasks from local vault.");
-        return await tasksCollection.getAll();
-      }
-    }
-  });
-
-  // Routed all mutations strictly through offline failover vault
-  const addTaskMutation = useMutation({
-    mutationFn: async (newTask: Partial<Task>) => {
-      const task = {
-        ...newTask,
-        id: newTask.id || crypto.randomUUID(),
-        dueDate: newTask.dueDate || new Date().toISOString(),
-        completed: newTask.completed || false,
-        isDeleted: false
-      } as Task;
-
-      await tasksCollection.insert(task);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
-  });
-
-  const completeTaskMutation = useMutation({
-    mutationFn: async (taskId: string) => {
-      const task = tasks.find(t => t.id === taskId);
-      if (!task) throw new Error("Task not found");
-      
-      await tasksCollection.update(taskId, { completed: true });
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
-  });
-
-  const deleteTaskMutation = useMutation({
-    mutationFn: async (taskId: string) => {
-      await tasksCollection.delete(taskId);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
-  });
+  // NATIVE SELECTOR: Handshake complete.
+  const { data: tasks = [], isLoading } = useLiveQuery((q) => 
+    q.from({ item: tasksCollection })
+  );
 
   return { 
-    tasks: tasks.filter(t => !t.isDeleted), 
+    tasks: tasks.filter((t: Task) => !t.isDeleted), 
     isLoading, 
-    addTask: addTaskMutation.mutateAsync, 
-    completeTask: completeTaskMutation.mutateAsync,
-    deleteTask: deleteTaskMutation.mutateAsync
+    addTask: async (newTask: Partial<Task>) => {
+      const task = { ...newTask, id: newTask.id || crypto.randomUUID(), isDeleted: false };
+      await tasksCollection.insert(task);
+    }, 
+    completeTask: async (taskId: string) => {
+      await tasksCollection.update(taskId, { completed: true });
+    },
+    deleteTask: async (taskId: string) => {
+      await tasksCollection.delete(taskId);
+    }
   };
 };

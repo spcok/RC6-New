@@ -1,51 +1,23 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { maintenanceCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
+import { MaintenanceLog } from '../../types';
 
 export const useMaintenanceData = () => {
-  const queryClient = useQueryClient();
-
-  const { data: maintenanceLogs = [], isLoading } = useLiveQuery<any[]>({
-    queryKey: ['maintenance_logs'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from('maintenance_logs').select('*');
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        return await maintenanceCollection.getAll();
-      }
-    }
-  });
-
-  const addLogMutation = useMutation({
-    mutationFn: async (log: any) => {
-      const newLog = { ...log, id: log.id || crypto.randomUUID(), isDeleted: false };
-      await maintenanceCollection.insert(newLog);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['maintenance_logs'] })
-  });
-
-  const updateLogMutation = useMutation({
-    mutationFn: async (log: any) => {
-      await maintenanceCollection.update(log.id, log);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['maintenance_logs'] })
-  });
-
-  const deleteLogMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await maintenanceCollection.delete(id);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['maintenance_logs'] })
-  });
+  const { data: maintenanceLogs = [], isLoading } = useLiveQuery((q) => 
+    q.from({ item: maintenanceCollection })
+  );
 
   return {
-    maintenanceLogs: maintenanceLogs.filter(m => !m.isDeleted),
+    maintenanceLogs: maintenanceLogs.filter((m: MaintenanceLog) => !m.isDeleted),
     isLoading,
-    addLog: addLogMutation.mutateAsync,
-    updateLog: updateLogMutation.mutateAsync,
-    deleteLog: deleteLogMutation.mutateAsync,
+    addMaintenanceLog: async (log: Partial<MaintenanceLog>) => {
+      await maintenanceCollection.insert({ ...log, id: log.id || crypto.randomUUID(), isDeleted: false } as MaintenanceLog);
+    },
+    updateMaintenanceLog: async (id: string, updates: Partial<MaintenanceLog>) => {
+      await maintenanceCollection.update(id, updates);
+    },
+    deleteMaintenanceLog: async (id: string) => {
+      await maintenanceCollection.delete(id);
+    }
   };
 };

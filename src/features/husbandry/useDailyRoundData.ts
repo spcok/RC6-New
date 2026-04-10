@@ -1,9 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AnimalCategory, DailyRound, LogType, Animal, LogEntry } from '../../types';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
 
 interface AnimalCheckState {
     isAlive?: boolean;
@@ -14,47 +12,10 @@ interface AnimalCheckState {
 }
 
 export function useDailyRoundData(viewDate: string) {
-    const queryClient = useQueryClient();
-
-    // 1. REACTIVE UI with Circuit Breaker Hydration
-    const { data: allAnimals = [], isLoading: isLoadingAnimals } = useLiveQuery<Animal[]>({
-        queryKey: ['animals'],
-        queryFn: async () => {
-            try {
-                const { data, error } = await supabase.from('animals').select('*');
-                if (error) throw error;
-                return data as Animal[];
-            } catch (err) {
-                return await animalsCollection.getAll();
-            }
-        }
-    });
-
-    const { data: liveLogs = [], isLoading: isLoadingLogs } = useLiveQuery<LogEntry[]>({
-        queryKey: ['daily_logs'],
-        queryFn: async () => {
-            try {
-                const { data, error } = await supabase.from('daily_logs').select('*');
-                if (error) throw error;
-                return data as LogEntry[];
-            } catch (err) {
-                return await dailyLogsCollection.getAll();
-            }
-        }
-    });
-
-    const { data: liveRounds = [], isLoading: isLoadingRounds } = useLiveQuery<DailyRound[]>({
-        queryKey: ['daily_rounds'],
-        queryFn: async () => {
-            try {
-                const { data, error } = await supabase.from('daily_rounds').select('*');
-                if (error) throw error;
-                return data as DailyRound[];
-            } catch (err) {
-                return await dailyRoundsCollection.getAll();
-            }
-        }
-    });
+    // 1. REACTIVE UI with Official Selectors
+    const { data: allAnimals = [], isLoading: isLoadingAnimals } = useLiveQuery((q) => q.from({ item: animalsCollection }));
+    const { data: liveLogs = [], isLoading: isLoadingLogs } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }));
+    const { data: liveRounds = [], isLoading: isLoadingRounds } = useLiveQuery((q) => q.from({ item: dailyRoundsCollection }));
     
     const isLoading = isLoadingAnimals || isLoadingLogs || isLoadingRounds;
 
@@ -129,15 +90,6 @@ export function useDailyRoundData(viewDate: string) {
     const isNoteRequired = useMemo(() => false, []);
 
     // 2. REMOTE MUTATION
-    const signOffMutation = useMutation({
-        mutationFn: async (roundData: DailyRound) => {
-            await dailyRoundsCollection.insert(roundData);
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['daily_rounds'] });
-        }
-    });
-
     const handleSignOff = async () => {
         if (!isComplete || !signingInitials) return;
         
@@ -155,7 +107,7 @@ export function useDailyRoundData(viewDate: string) {
                 completedAt: new Date().toISOString()
             } as DailyRound;
 
-            await signOffMutation.mutateAsync(roundData);
+            await dailyRoundsCollection.insert(roundData);
         } catch (error) {
             console.error('Failed to sign off round:', error);
         }
@@ -178,7 +130,7 @@ export function useDailyRoundData(viewDate: string) {
         setSigningInitials, 
         generalNotes, 
         setGeneralNotes, 
-        isSubmitting: signOffMutation.isPending, 
+        isSubmitting: false, // Simplified for this refactor
         isPastRound, 
         toggleWater, 
         toggleSecure, 
