@@ -2,55 +2,36 @@ import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 
-export const useSupabaseRealtime = () => {
+export function useSupabaseRealtime() {
   useEffect(() => {
+    // 1. Create a single WebSocket connection for the entire database
     const channel = supabase
       .channel('global-db-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public' },
         (payload) => {
-          console.log('Realtime change received:', payload);
-          const table = payload.table;
+          const tableName = payload.table;
           
-          // Invalidate relevant queries based on the table
-          if (table === 'animals') {
-            queryClient.invalidateQueries({ queryKey: ['animals'] });
-            queryClient.invalidateQueries({ queryKey: ['animal'] });
-          } else if (table === 'tasks') {
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-          } else if (table === 'clinical_notes') {
-            queryClient.invalidateQueries({ queryKey: ['clinical_notes'] });
-          } else if (table === 'mar_charts') {
-            queryClient.invalidateQueries({ queryKey: ['mar_charts'] });
-          } else if (table === 'quarantine_records') {
-            queryClient.invalidateQueries({ queryKey: ['quarantine_records'] });
-          } else if (table === 'timesheets') {
-            queryClient.invalidateQueries({ queryKey: ['timesheets'] });
-          } else {
-            // Fallback: invalidate everything if we're not sure
-            queryClient.invalidateQueries();
-          }
+          console.log(`[Realtime] ${payload.eventType} detected on ${tableName}. Invalidating local cache...`);
+          
+          // 2. Tell TanStack to instantly fetch the new data in the background
+          queryClient.invalidateQueries({ 
+            queryKey: [tableName],
+            // EXACT Match ensures we don't accidentally invalidate nested/unrelated queries
+            exact: true 
+          });
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'daily_logs' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['daily_logs'] });
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] WebSocket connected. Listening for cloud syncs.');
         }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'daily_logs' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['daily_logs'] });
-        }
-      )
-      .subscribe();
+      });
 
+    // 3. Cleanup the socket if the app unmounts
     return () => {
       supabase.removeChannel(channel);
     };
   }, []);
-};
+}

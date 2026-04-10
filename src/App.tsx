@@ -5,6 +5,13 @@ import { queryClient } from './lib/queryClient';
 import { useAuthStore } from './store/authStore';
 import { router } from './router';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useSupabaseRealtime } from './hooks/useSupabaseRealtime';
+
+function GlobalHooks() {
+  // Mount the realtime listener permanently 
+  useSupabaseRealtime();
+  return null;
+}
 
 export default function App() {
   const initialize = useAuthStore(state => state.initialize);
@@ -22,6 +29,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <GlobalHooks />
         <RouterProvider router={router} context={{ auth: authContext }} />
       </QueryClientProvider>
     </ErrorBoundary>
