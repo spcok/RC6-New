@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection, dailyLogsCollection, tasksCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { Animal, AnimalCategory, LogType, LogEntry, Task, DailyLog } from '../../types';
@@ -27,51 +27,40 @@ export interface PendingTask {
 
 export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDate: string) {
   
-  // 1. Fetch Animals
-  const { data: rawAnimals = [], isLoading: animalsLoading } = useQuery<Animal[]>({
+  // 1. Fetch Animals using the .live() handshake
+  const { data: rawAnimals = [], isLoading: animalsLoading } = useLiveQuery<Animal[]>({
     queryKey: ['animals'],
     queryFn: async () => {
-      try {
+      // THE FIX: This handshake prevents the _getQuery error
+      return animalsCollection.live(async () => {
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
-        const mappedData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
-        return mappedData;
-      } catch {
-        console.warn("Network unreachable. Serving animals from local vault.");
-        return await animalsCollection.getAll();
-      }
+        return mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
+      });
     }
   });
 
-  // 2. Fetch Logs
-  const { data: rawLogs = [], isLoading: logsLoading } = useQuery<DailyLog[]>({
-    queryKey: ['dailyLogs'],
+  // 2. Fetch Logs using the .live() handshake
+  const { data: rawLogs = [], isLoading: logsLoading } = useLiveQuery<DailyLog[]>({
+    queryKey: ['daily_logs'],
     queryFn: async () => {
-      try {
+      return dailyLogsCollection.live(async () => {
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
-        const mappedData = mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
-        return mappedData;
-      } catch {
-        console.warn("Network unreachable. Serving daily logs from local vault.");
-        return await dailyLogsCollection.getAll();
-      }
+        return mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
+      });
     }
   });
 
-  // 3. Fetch Tasks
-  const { data: rawTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+  // 3. Fetch Tasks using the .live() handshake
+  const { data: rawTasks = [], isLoading: tasksLoading } = useLiveQuery<Task[]>({
     queryKey: ['tasks'],
     queryFn: async () => {
-      try {
+      return tasksCollection.live(async () => {
         const { data, error } = await supabase.from('tasks').select('*');
         if (error) throw error;
-        const mappedData = mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
-        return mappedData;
-      } catch {
-        console.warn("Network unreachable. Serving tasks from local vault.");
-        return await tasksCollection.getAll();
-      }
+        return mapToCamelCase<Task>(data as Record<string, unknown>[]) as Task[];
+      });
     }
   });
 
@@ -102,7 +91,6 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
     
     const weighed = new Set(todayLogs.filter(l => l.logType === LogType.WEIGHT).map(l => l.animalId)).size;
     const fed = new Set(todayLogs.filter(l => l.logType === LogType.FEED).map(l => l.animalId)).size;
-
     return { total: filtered.length, weighed, fed, animalData: new Map<string, AnimalStatsData>() };
   }, [liveAnimals, activeTab, todayLogsFiltered]);
 
