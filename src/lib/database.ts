@@ -49,50 +49,47 @@ const createFailoverCollection = <T extends { id: string | number }>(
       getOfflineData: async () => { return []; },
       
       onInsert: async ({ transaction }) => {
-        if (!navigator.onLine) {
-          console.log(`[Vault] Offline. ${tableName} insert retained locally.`);
-          return; // Prevents unhandled rejection; data stays in local IndexedDB
-        }
-        try {
-          const items = transaction.mutations.map(m => m.modified);
-          const { error } = await supabase.from(tableName).insert(items);
-          if (error) throw error;
-        } catch (err) {
-          console.error(`[Sync Error] Failed to push insert to ${tableName}:`, err);
-        }
+        const items = transaction.mutations.map(m => m.modified);
+        
+        // Build and execute a native TanStack Mutation programmatically
+        queryClient.getMutationCache().build(queryClient, {
+          mutationFn: async () => {
+            const { error } = await supabase.from(tableName).insert(items);
+            if (error) throw error;
+          },
+          networkMode: 'offlineFirst',
+          retry: 3, // Optional: Let TanStack retry a few times if the network is spotty
+        }).execute();
       },
+      
       onUpdate: async ({ transaction }) => {
-        if (!navigator.onLine) {
-          console.log(`[Vault] Offline. ${tableName} update retained locally.`);
-          return;
-        }
-        try {
-          for (const m of transaction.mutations) {
-            const { error } = await supabase.from(tableName).update(m.changes).eq('id', m.key);
-            if (error) throw error;
-          }
-        } catch (err) {
-           console.error(`[Sync Error] Failed to push update to ${tableName}:`, err);
-        }
+        // Group all updates in this transaction into a single queued mutation
+        queryClient.getMutationCache().build(queryClient, {
+          mutationFn: async () => {
+            for (const m of transaction.mutations) {
+              const { error } = await supabase.from(tableName).update(m.changes).eq('id', m.key);
+              if (error) throw error;
+            }
+          },
+          networkMode: 'offlineFirst',
+        }).execute();
       },
+      
       onDelete: async ({ transaction }) => {
-        if (!navigator.onLine) {
-          console.log(`[Vault] Offline. ${tableName} delete retained locally.`);
-          return;
-        }
-        try {
-          const keys = transaction.mutations.map(m => m.key);
-          // FIX: Use hard delete if the table lacks an 'is_deleted' column
-          if (options.hasSoftDelete) {
-            const { error } = await supabase.from(tableName).update({ is_deleted: true }).in('id', keys);
-            if (error) throw error;
-          } else {
-            const { error } = await supabase.from(tableName).delete().in('id', keys);
-            if (error) throw error;
-          }
-        } catch (err) {
-          console.error(`[Sync Error] Failed to push delete to ${tableName}:`, err);
-        }
+        const keys = transaction.mutations.map(m => m.key);
+        
+        queryClient.getMutationCache().build(queryClient, {
+          mutationFn: async () => {
+            if (options.hasSoftDelete) {
+              const { error } = await supabase.from(tableName).update({ is_deleted: true }).in('id', keys);
+              if (error) throw error;
+            } else {
+              const { error } = await supabase.from(tableName).delete().in('id', keys);
+              if (error) throw error;
+            }
+          },
+          networkMode: 'offlineFirst',
+        }).execute();
       }
     })
   );
