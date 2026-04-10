@@ -14,37 +14,40 @@ export const formatWeightDisplay = (grams: number, unit: 'g' | 'oz' | 'lbs_oz' |
   return `${Math.round(grams)} g`;
 };
 
-export const convertToGrams = (unit: 'g' | 'oz' | 'lb', values: { g?: number; lb?: number; oz?: number }): number => {
+export const convertToGrams = (unit: 'g' | 'oz' | 'lb', values: { g?: number; lb?: number; oz?: number; eighths?: number }): number => {
   if (unit === 'g') return values.g || 0;
   
   const ozInGrams = 28.3495;
+  // FIX: Include the eighths fraction in the calculation
+  const fractionOz = (values.eighths || 0) / 8;
   
   if (unit === 'oz') {
-    return (values.oz || 0) * ozInGrams;
+    return ((values.oz || 0) + fractionOz) * ozInGrams;
   }
   
   if (unit === 'lb') {
     const lbInGrams = ozInGrams * 16;
-    return (values.lb || 0) * lbInGrams + (values.oz || 0) * ozInGrams;
+    return (values.lb || 0) * lbInGrams + ((values.oz || 0) + fractionOz) * ozInGrams;
   }
   
   return 0;
 };
 
 export const convertFromGrams = (grams: number, unit: 'g' | 'oz' | 'lb'): { g: number; lb: number; oz: number; eighths: number } => {
-  const totalOz = grams / 28.3495;
-  const eighths = Math.round((totalOz % 1) * 8);
-
   if (unit === 'g') return { g: Math.round(grams), lb: 0, oz: 0, eighths: 0 };
   
+  // FIX: Calculate everything purely in eighths to prevent rounding edge cases (like 8/8ths)
+  const totalEighths = Math.round((grams / 28.3495) * 8);
+  const eighths = totalEighths % 8;
+  const totalOz = Math.floor(totalEighths / 8);
+
   if (unit === 'oz') {
-    const oz = Math.floor(totalOz);
-    return { g: 0, lb: 0, oz, eighths };
+    return { g: 0, lb: 0, oz: totalOz, eighths };
   }
   
   if (unit === 'lb') {
     const lb = Math.floor(totalOz / 16);
-    const oz = Math.floor(totalOz % 16);
+    const oz = totalOz % 16;
     return { g: 0, lb, oz, eighths };
   }
   

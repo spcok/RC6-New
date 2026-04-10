@@ -12,10 +12,15 @@ interface AnimalCheckState {
 }
 
 export function useDailyRoundData(viewDate: string) {
-    // 1. REACTIVE UI with Official Selectors
-    const { data: allAnimals = [], isLoading: isLoadingAnimals } = useLiveQuery((q) => q.from({ item: animalsCollection }));
-    const { data: liveLogs = [], isLoading: isLoadingLogs } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }));
-    const { data: liveRounds = [], isLoading: isLoadingRounds } = useLiveQuery((q) => q.from({ item: dailyRoundsCollection }));
+    // 1. REACTIVE UI with Official Selectors & Safe Arrays
+    const { data: rawAnimals, isLoading: isLoadingAnimals } = useLiveQuery((q) => q.from({ item: animalsCollection }));
+    const allAnimals = Array.isArray(rawAnimals) ? rawAnimals : [];
+
+    const { data: rawLogs, isLoading: isLoadingLogs } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }));
+    const liveLogs = Array.isArray(rawLogs) ? rawLogs : [];
+
+    const { data: rawRounds, isLoading: isLoadingRounds } = useLiveQuery((q) => q.from({ item: dailyRoundsCollection }));
+    const liveRounds = Array.isArray(rawRounds) ? rawRounds : [];
     
     const isLoading = isLoadingAnimals || isLoadingLogs || isLoadingRounds;
 
@@ -39,11 +44,12 @@ export function useDailyRoundData(viewDate: string) {
         setGeneralNotes(currentRound?.notes || '');
     }, [currentRound]);
 
-    const categoryAnimals = useMemo(() => allAnimals.filter(a => a.category === activeTab), [allAnimals, activeTab]);
+    // FIX: Added !a.isDeleted && !a.archived to prevent dead/archived animals from blocking the round
+    const categoryAnimals = useMemo(() => allAnimals.filter(a => a.category === activeTab && !a.isDeleted && !a.archived), [allAnimals, activeTab]);
 
     const freezingRisks = useMemo(() => {
         const risks: Record<string, boolean> = {};
-        if (!liveLogs) return risks;
+        if (!liveLogs.length) return risks;
         categoryAnimals.forEach(animal => {
             if (animal.waterTippingTemp !== undefined) {
                 const tempLog = liveLogs.find(l => l.animalId === animal.id && l.logType === LogType.TEMPERATURE);
@@ -89,7 +95,7 @@ export function useDailyRoundData(viewDate: string) {
     const isComplete = totalAnimals > 0 && completedChecks === totalAnimals;
     const isNoteRequired = useMemo(() => false, []);
 
-    // 2. REMOTE MUTATION
+    // 2. REMOTE MUTATION (FIXED: Update vs Insert)
     const handleSignOff = async () => {
         if (!isComplete || !signingInitials) return;
         
@@ -107,7 +113,11 @@ export function useDailyRoundData(viewDate: string) {
                 completedAt: new Date().toISOString()
             } as DailyRound;
 
-            await dailyRoundsCollection.insert(roundData);
+            if (currentRound) {
+                await dailyRoundsCollection.update(roundId, roundData);
+            } else {
+                await dailyRoundsCollection.insert(roundData);
+            }
         } catch (error) {
             console.error('Failed to sign off round:', error);
         }
@@ -130,7 +140,7 @@ export function useDailyRoundData(viewDate: string) {
         setSigningInitials, 
         generalNotes, 
         setGeneralNotes, 
-        isSubmitting: false, // Simplified for this refactor
+        isSubmitting: false, 
         isPastRound, 
         toggleWater, 
         toggleSecure, 

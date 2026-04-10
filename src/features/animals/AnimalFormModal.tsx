@@ -128,8 +128,7 @@ const AnimalFormModal: React.FC<Props> = ({ isOpen, initialData, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <form.Provider>
-                <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }}>
+            <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }}>
                     <div className="p-6 space-y-6">
                         <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                             <h2 className="text-2xl font-bold text-slate-900">{initialData ? 'Edit Animal' : 'Add New Animal'}</h2>
@@ -175,7 +174,6 @@ const AnimalFormModal: React.FC<Props> = ({ isOpen, initialData, onClose }) => {
                         </div>
                     </div>
                 </form>
-            </form.Provider>
         </div>
     </div>
   );
