@@ -37,15 +37,10 @@ const createFailoverCollection = <T extends { id: string | number }>(
       queryClient,
       queryKey: [tableName],
       queryFn: async () => {
+        // OFFICIAL PATTERN: Throwing standard network errors delegates 
+        // fallback responsibility to TanStack Query's native offline queue.
         if (!navigator.onLine) {
-          throw new Error(`[Network] Offline. Preserving local vault for ${tableName}.`);
-        }
-        
-        // FIX: The Auth Race Condition
-        // Ensure Supabase has finished booting its token before we ask for data
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          throw new Error(`[Auth] Session initializing. Preserving IndexedDB cache for ${tableName}.`);
+          throw new Error('Offline');
         }
         
         let query = supabase.from(tableName).select('*');

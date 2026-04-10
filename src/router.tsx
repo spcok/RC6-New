@@ -1,10 +1,10 @@
 import { createRouter, createRoute, createRootRouteWithContext, redirect, Outlet } from '@tanstack/react-router';
 import { queryClient } from './lib/queryClient';
+import { supabase } from './lib/supabase';
 import { AuthGuard } from './components/auth/AuthGuard';
 import Layout from './components/layout/Layout';
 import LoginScreen from './features/auth/LoginScreen';
 
-// Physical File Map Imports
 import DashboardContainer from './features/dashboard/DashboardContainer';
 import AnimalsList from './features/animals/AnimalsList';
 import AnimalProfile from './features/animals/AnimalProfile';
@@ -29,7 +29,6 @@ import FirstAid from './features/safety/tabs/FirstAid';
 import Incidents from './features/safety/tabs/Incidents';
 import SafetyDrills from './features/safety/tabs/SafetyDrills';
 
-// Settings Tabs (Preserved for SettingsLayout functionality)
 import OrgProfile from './features/settings/tabs/OrgProfile';
 import Directory from './features/settings/tabs/Directory';
 import OperationalLists from './features/settings/tabs/OperationalLists';
@@ -60,6 +59,11 @@ const loginRoute = createRoute({
 const authRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
+  beforeLoad: async () => {
+    // THE OFFICIAL FIX: Await Auth resolution BEFORE any child loaders fire.
+    // This mathematically prevents the "Auth Race Condition".
+    await supabase.auth.getSession();
+  },
   loader: () => {
     return {};
   },
@@ -83,15 +87,15 @@ const dashboardRoute = createRoute({
   path: '/dashboard',
   component: DashboardContainer,
   loader: async () => {
+    // THE OFFICIAL FIX: prefetchQuery silently swallows offline errors
     await Promise.all([
-      queryClient.ensureQueryData({ queryKey: ['animals'] }),
-      queryClient.ensureQueryData({ queryKey: ['daily_logs'] }),
-      queryClient.ensureQueryData({ queryKey: ['tasks'] })
+      queryClient.prefetchQuery({ queryKey: ['animals'] }),
+      queryClient.prefetchQuery({ queryKey: ['daily_logs'] }),
+      queryClient.prefetchQuery({ queryKey: ['tasks'] })
     ]);
   }
 });
 
-// Animals
 const animalsRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/animals',
@@ -102,7 +106,7 @@ const animalsIndexRoute = createRoute({
   path: '/',
   component: AnimalsList,
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['animals'] });
+    await queryClient.prefetchQuery({ queryKey: ['animals'] });
   }
 });
 
@@ -112,7 +116,6 @@ const animalProfileRoute = createRoute({
   component: AnimalProfile,
 });
 
-// Husbandry Layout (Pathless)
 const husbandryRoute = createRoute({
   getParentRoute: () => authRoute,
   id: 'husbandry-layout',
@@ -127,7 +130,7 @@ const dailyLogRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['daily_logs'] });
+    await queryClient.prefetchQuery({ queryKey: ['daily_logs'] });
   },
   component: DailyLog,
 });
@@ -141,7 +144,7 @@ const dailyRoundsRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['daily_rounds'] });
+    await queryClient.prefetchQuery({ queryKey: ['daily_rounds'] });
   },
   component: DailyRounds,
 });
@@ -155,7 +158,7 @@ const tasksRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['tasks'] });
+    await queryClient.prefetchQuery({ queryKey: ['tasks'] });
   },
   component: Tasks,
 });
@@ -166,7 +169,6 @@ const feedingScheduleRoute = createRoute({
   component: FeedingSchedule,
 });
 
-// Medical
 const medicalRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/medical',
@@ -176,7 +178,7 @@ const medicalRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['medical_logs'] });
+    await queryClient.prefetchQuery({ queryKey: ['medical_logs'] });
   },
   component: MedicalRecords,
 });
@@ -190,7 +192,7 @@ const medicationsRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['mar_charts'] });
+    await queryClient.prefetchQuery({ queryKey: ['mar_charts'] });
   },
   component: MarCharts,
 });
@@ -204,12 +206,11 @@ const quarantineRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['quarantine_records'] });
+    await queryClient.prefetchQuery({ queryKey: ['quarantine_records'] });
   },
   component: QuarantineRecords,
 });
 
-// Logistics Layout (Pathless)
 const logisticsRoute = createRoute({
   getParentRoute: () => authRoute,
   id: 'logistics-layout',
@@ -224,7 +225,7 @@ const movementsRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['movements'] });
+    await queryClient.prefetchQuery({ queryKey: ['movements'] });
   },
   component: Movements,
 });
@@ -235,7 +236,6 @@ const flightsRoute = createRoute({
   component: FlightRecords,
 });
 
-// Staff Layout (Pathless)
 const staffRoute = createRoute({
   getParentRoute: () => authRoute,
   id: 'staff-layout',
@@ -245,7 +245,7 @@ const rotaRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: '/staff-rota',
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['staff_rota'] });
+    await queryClient.prefetchQuery({ queryKey: ['staff_rota'] });
   },
   component: StaffRota,
 });
@@ -259,7 +259,7 @@ const timesheetsRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['timesheets'] });
+    await queryClient.prefetchQuery({ queryKey: ['timesheets'] });
   },
   component: Timesheets,
 });
@@ -273,12 +273,11 @@ const holidaysRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['holidays'] });
+    await queryClient.prefetchQuery({ queryKey: ['holidays'] });
   },
   component: Holidays,
 });
 
-// Reports Layout (Pathless)
 const reportsRoute = createRoute({
   getParentRoute: () => authRoute,
   id: 'reports-layout',
@@ -306,14 +305,12 @@ const complianceRoute = createRoute({
   component: MissingRecords,
 });
 
-// Help
 const helpRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/help',
   component: HelpSupport,
 });
 
-// Safety Layout (Pathless)
 const safetyRoute = createRoute({
   getParentRoute: () => authRoute,
   id: 'safety-layout',
@@ -328,7 +325,7 @@ const maintenanceRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['maintenance_logs'] });
+    await queryClient.prefetchQuery({ queryKey: ['maintenance_logs'] });
   },
   component: SiteMaintenance,
 });
@@ -342,7 +339,7 @@ const incidentsRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['incidents'] });
+    await queryClient.prefetchQuery({ queryKey: ['incidents'] });
   },
   component: Incidents,
 });
@@ -356,7 +353,7 @@ const firstAidRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['first_aid_logs'] });
+    await queryClient.prefetchQuery({ queryKey: ['first_aid_logs'] });
   },
   component: FirstAid,
 });
@@ -370,12 +367,11 @@ const drillsRoute = createRoute({
     }
   },
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['safety_drills'] });
+    await queryClient.prefetchQuery({ queryKey: ['safety_drills'] });
   },
   component: SafetyDrills,
 });
 
-// Settings
 const settingsRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/settings',
@@ -386,7 +382,6 @@ const settingsRoute = createRoute({
   },
   component: SettingsLayout,
 });
-// ... (rest of the file)
 
 const settingsIndexRoute = createRoute({
   getParentRoute: () => settingsRoute,
@@ -400,7 +395,7 @@ const settingsOrgRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/organization',
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['organisations'] });
+    await queryClient.prefetchQuery({ queryKey: ['organisations'] });
   },
   component: OrgProfile,
 });
@@ -409,7 +404,7 @@ const settingsDirectoryRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/directory',
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['directory_contacts'] });
+    await queryClient.prefetchQuery({ queryKey: ['directory_contacts'] });
   },
   component: Directory,
 });
@@ -436,7 +431,7 @@ const settingsZlaRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/zla',
   loader: async () => {
-    await queryClient.ensureQueryData({ queryKey: ['zla_documents'] });
+    await queryClient.prefetchQuery({ queryKey: ['zla_documents'] });
   },
   component: ZLADocuments,
 });
@@ -513,7 +508,7 @@ export const router = createRouter({
   routeTree,
   context: {
     queryClient,
-    auth: undefined!, // This will be set in the provider
+    auth: undefined!,
   },
   defaultPreload: 'intent',
   defaultNotFoundComponent: () => <div className="p-8 text-center text-slate-500 font-bold">404 - Page Not Found</div>
