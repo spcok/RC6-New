@@ -9,7 +9,6 @@ const calculatePermissions = (role: string): UserPermissions => {
   const roleUpper = role.toUpperCase();
   const isAdmin = roleUpper === 'OWNER' || roleUpper === 'ADMIN';
   
-  // Default locked permissions
   const permissions: UserPermissions = {
     dashboard: isAdmin, dailyLog: isAdmin, tasks: isAdmin, medical: isAdmin,
     movements: isAdmin, safety: isAdmin, maintenance: isAdmin, settings: isAdmin,
@@ -67,9 +66,22 @@ export const useAuthStore = create<AuthState>()(
                 3000,
                 "Session check timed out"
               );
+              
               if (session && session.user) {
                 const user = session.user;
                 const role = user.user_metadata?.role || 'GUEST';
+                
+                // 1. Fetch exact initials from the users table
+                let actualInitials = (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase();
+                try {
+                  const { data: dbUser } = await supabase.from('users').select('initials').eq('id', user.id).single();
+                  if (dbUser?.initials) {
+                    actualInitials = dbUser.initials;
+                  }
+                } catch {
+                  console.warn('[Auth] Could not fetch explicit database initials, using fallback.');
+                }
+
                 set({
                   session,
                   currentUser: {
@@ -77,7 +89,7 @@ export const useAuthStore = create<AuthState>()(
                     email: user.email || '',
                     name: user.user_metadata?.name || user.email || 'Unknown User',
                     role: role,
-                    initials: (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase(),
+                    initials: actualInitials,
                     permissions: calculatePermissions(role),
                   },
                   hasInitialized: true,
@@ -121,6 +133,18 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const role = user.user_metadata?.role || 'GUEST';
+          
+          // 2. Fetch exact initials from the users table during login
+          let actualInitials = (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase();
+          try {
+            const { data: dbUser } = await supabase.from('users').select('initials').eq('id', user.id).single();
+            if (dbUser?.initials) {
+              actualInitials = dbUser.initials;
+            }
+          } catch {
+            console.warn('[Auth] Could not fetch explicit database initials, using fallback.');
+          }
+
           set({
             session,
             currentUser: {
@@ -128,7 +152,7 @@ export const useAuthStore = create<AuthState>()(
               email: user.email || '',
               name: user.user_metadata?.name || user.email || 'Unknown User',
               role: role,
-              initials: (user.user_metadata?.name || user.email || '??').substring(0, 2).toUpperCase(),
+              initials: actualInitials,
               permissions: calculatePermissions(role),
             },
             isLoading: false

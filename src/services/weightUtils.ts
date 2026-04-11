@@ -2,15 +2,27 @@ export const formatWeightDisplay = (grams: number, unit: 'g' | 'oz' | 'lbs_oz' |
   if (unit === 'kg') {
     return `${(grams / 1000).toFixed(2)} kg`;
   }
+  
+  if (unit === 'g') {
+    return `${Math.round(grams)} g`;
+  }
+
+  // Calculate eighths for imperial displays
+  const totalEighths = Math.round((grams / 28.3495) * 8);
+  const eighths = totalEighths % 8;
+  const totalOz = Math.floor(totalEighths / 8);
+  const fractionStr = eighths > 0 ? ` ${eighths}/8` : '';
+
   if (unit === 'oz') {
-    return `${(grams / 28.3495).toFixed(1)} oz`;
+    return `${totalOz}${fractionStr} oz`;
   }
+  
   if (unit === 'lbs_oz') {
-    const totalOz = grams / 28.3495;
     const lbs = Math.floor(totalOz / 16);
-    const oz = (totalOz % 16).toFixed(1);
-    return `${lbs} lb ${oz} oz`;
+    const oz = totalOz % 16;
+    return `${lbs} lb ${oz}${fractionStr} oz`;
   }
+  
   return `${Math.round(grams)} g`;
 };
 
@@ -18,7 +30,6 @@ export const convertToGrams = (unit: 'g' | 'oz' | 'lb', values: { g?: number; lb
   if (unit === 'g') return values.g || 0;
   
   const ozInGrams = 28.3495;
-  // FIX: Include the eighths fraction in the calculation
   const fractionOz = (values.eighths || 0) / 8;
   
   if (unit === 'oz') {
@@ -36,7 +47,6 @@ export const convertToGrams = (unit: 'g' | 'oz' | 'lb', values: { g?: number; lb
 export const convertFromGrams = (grams: number, unit: 'g' | 'oz' | 'lb'): { g: number; lb: number; oz: number; eighths: number } => {
   if (unit === 'g') return { g: Math.round(grams), lb: 0, oz: 0, eighths: 0 };
   
-  // FIX: Calculate everything purely in eighths to prevent rounding edge cases (like 8/8ths)
   const totalEighths = Math.round((grams / 28.3495) * 8);
   const eighths = totalEighths % 8;
   const totalOz = Math.floor(totalEighths / 8);
@@ -63,5 +73,5 @@ export const parseLegacyWeightToGrams = (raw: string | undefined | null): number
   if (s.includes('kg')) return num * 1000;
   if (s.includes('oz')) return num * 28.3495;
   if (s.includes('lb')) return num * 453.592;
-  return num; // Default assumption is grams
+  return num;
 };

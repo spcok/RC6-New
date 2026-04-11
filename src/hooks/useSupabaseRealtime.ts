@@ -13,29 +13,36 @@ export function useSupabaseRealtime() {
         (payload) => {
           const tableName = payload.table;
           
-          // SURGICAL CACHE INJECTION: No network refetch required!
           if (payload.eventType === 'INSERT') {
             const newItem = mapToCamelCase(payload.new);
-            queryClient.setQueryData([tableName], (oldData: unknown[] | undefined) => {
+            queryClient.setQueryData([tableName], (oldData: unknown[]) => {
               return oldData ? [...oldData, newItem] : [newItem];
             });
           } 
           else if (payload.eventType === 'UPDATE') {
-            const updatedItem = mapToCamelCase(payload.new as Record<string, unknown>);
-            queryClient.setQueryData([tableName], (oldData: unknown[] | undefined) => {
+            const updatedItem = mapToCamelCase(payload.new);
+            queryClient.setQueryData([tableName], (oldData: unknown[]) => {
               if (!oldData) return [updatedItem];
-              return oldData.map((item: any) => item.id === updatedItem.id ? updatedItem : item);
+              return oldData.map((item: unknown) => (item as { id: string }).id === updatedItem.id ? updatedItem : item);
             });
           } 
           else if (payload.eventType === 'DELETE') {
-            queryClient.setQueryData([tableName], (oldData: unknown[] | undefined) => {
+            queryClient.setQueryData([tableName], (oldData: unknown[]) => {
               if (!oldData) return [];
-              return oldData.filter((item: any) => item.id !== payload.old.id);
+              return oldData.filter((item: unknown) => (item as { id: string }).id !== payload.old.id);
             });
           }
         }
       )
-      .subscribe();
+      // FIX: Explicitly providing the callback prevents Supabase from crashing 
+      // when proxy interceptors or incognito mode block the WebSocket.
+      .subscribe((status, err) => {
+        if (err) {
+          console.warn('[Realtime] WebSocket blocked or degraded (Safe to ignore in offline-first mode):', err);
+        } else {
+          console.log(`[Realtime] Connection Status: ${status}`);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
