@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useForm } from '@tanstack/react-form';
 import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
@@ -29,7 +29,8 @@ interface WeightFormProps {
 
 export default function WeightForm({ animal, date, userInitials, existingLog, onSave, onCancel }: WeightFormProps) {
   const targetUnit = animal?.weightUnit === 'lbs_oz' ? 'lb' : (animal?.weightUnit === 'oz' ? 'oz' : 'g');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Removed local isSubmitting state - relying exclusively on TanStack Form's internal state
 
   const form = useForm({
     defaultValues: {
@@ -42,7 +43,6 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
       onChange: weightSchema,
     },
     onSubmit: async ({ value }) => {
-      setIsSubmitting(true);
       try {
         const payload: Partial<LogEntry> = {
           id: existingLog?.id || uuidv4(),
@@ -51,7 +51,7 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
           logDate: date,
           userInitials: userInitials,
           weightGrams: value.weightGrams,
-          weight: value.weightGrams,
+          weight: value.weightGrams, // Legacy dual-capture preservation
           weightUnit: animal.weightUnit,
           value: `${value.weightGrams}g`,
           notes: value.notes
@@ -65,8 +65,6 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
         } else {
           alert('Failed to save log');
         }
-      } finally {
-        setIsSubmitting(false);
       }
     }
   });
@@ -89,18 +87,18 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
               {targetUnit === 'g' && (
                 <div className="sm:col-span-3">
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Grams</label>
-                  <input type="number" value={field.state.value.g || ''} onChange={(e) => handleWeightChange('g', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500" placeholder="e.g. 1050" />
+                  <input type="number" value={field.state.value.g || ''} onBlur={field.handleBlur} onChange={(e) => handleWeightChange('g', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500" placeholder="e.g. 1050" />
                 </div>
               )}
               {targetUnit === 'oz' && (
                 <>
                   <div className="sm:col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Ounces (oz)</label>
-                    <input type="number" value={field.state.value.oz || ''} onChange={(e) => handleWeightChange('oz', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500" placeholder="oz" />
+                    <input type="number" value={field.state.value.oz || ''} onBlur={field.handleBlur} onChange={(e) => handleWeightChange('oz', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500" placeholder="oz" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">8ths</label>
-                    <select value={field.state.value.eighths || 0} onChange={(e) => handleWeightChange('eighths', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500">
+                    <select value={field.state.value.eighths || 0} onBlur={field.handleBlur} onChange={(e) => handleWeightChange('eighths', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500">
                       {[0,1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n}/8</option>)}
                     </select>
                   </div>
@@ -110,17 +108,17 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
                 <>
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pounds (lb)</label>
-                    <input type="number" value={field.state.value.lb || ''} onChange={(e) => handleWeightChange('lb', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500" placeholder="lb" />
+                    <input type="number" value={field.state.value.lb || ''} onBlur={field.handleBlur} onChange={(e) => handleWeightChange('lb', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500" placeholder="lb" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Ounces (oz)</label>
-                    <select value={field.state.value.oz || 0} onChange={(e) => handleWeightChange('oz', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500">
+                    <select value={field.state.value.oz || 0} onBlur={field.handleBlur} onChange={(e) => handleWeightChange('oz', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500">
                       {Array.from({length: 16}, (_, i) => i).map(n => <option key={n} value={n}>{n} oz</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">8ths</label>
-                    <select value={field.state.value.eighths || 0} onChange={(e) => handleWeightChange('eighths', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500">
+                    <select value={field.state.value.eighths || 0} onBlur={field.handleBlur} onChange={(e) => handleWeightChange('eighths', e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-500">
                       {[0,1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n}/8</option>)}
                     </select>
                   </div>
@@ -135,15 +133,17 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
       <form.Field name="notes" children={(field) => (
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Notes (Optional)</label>
-          <textarea value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" />
+          <textarea value={field.state.value} onBlur={field.handleBlur} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" />
         </div>
       )} />
       
       <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
         <button type="button" onClick={onCancel} className="px-6 py-3 bg-white border-2 text-slate-600 rounded-xl font-bold uppercase text-xs">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2">
-          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
-        </button>
+        <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]} children={([canSubmit, isSubmitting]) => (
+          <button type="submit" disabled={!canSubmit || isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2 disabled:opacity-50">
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
+          </button>
+        )} />
       </div>
     </form>
   );

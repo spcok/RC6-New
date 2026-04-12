@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useForm } from '@tanstack/react-form';
+import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 import { Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,8 +24,8 @@ interface BirthFormProps {
 }
 
 export default function BirthForm({ animal, date, userInitials, existingLog, onSave, onCancel }: BirthFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
+  // Removed manual isSubmitting state
+  
   const form = useForm({
     defaultValues: {
       litterSize: 0,
@@ -32,13 +33,15 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
       notes: existingLog?.notes || '',
       pups: [] as { id: string; name: string }[]
     },
+    validatorAdapter: zodValidator(),
+    validators: {
+      onChange: birthSchema,
+    },
     onSubmit: async ({ value }) => {
-      setIsSubmitting(true);
       try {
-        const safePayload = birthSchema.parse(value);
-        
+        // CRITICAL BUSINESS LOGIC: Spawn new animal profiles for the pups
         if (!existingLog) {
-          for (const pup of safePayload.pups) {
+          for (const pup of value.pups) {
             await animalsCollection.sync({
               id: pup.id,
               name: pup.name,
@@ -65,14 +68,15 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
           }
         }
 
+        // Generate the log entry for the parent
         const payload: Partial<LogEntry> = {
           id: existingLog?.id || uuidv4(),
           animalId: animal.id,
           logType: LogType.BIRTH,
           logDate: date,
           userInitials: userInitials,
-          value: `Litter Size: ${safePayload.litterSize} (${safePayload.litterHealth})`,
-          notes: safePayload.notes
+          value: `Litter Size: ${value.litterSize} (${value.litterHealth})`,
+          notes: value.notes
         };
         await onSave(payload);
         onCancel(); // Force modal to close on success
@@ -83,8 +87,6 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
         } else {
           alert('Failed to save log');
         }
-      } finally {
-        setIsSubmitting(false);
       }
     }
   });
@@ -95,13 +97,13 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
         <form.Field name="litterSize" children={(field) => (
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Litter Size</label>
-            <input type="number" value={field.state.value} onChange={e => field.handleChange(parseInt(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" required />
+            <input type="number" value={field.state.value} onBlur={field.handleBlur} onChange={e => field.handleChange(parseInt(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" required />
           </div>
         )} />
         <form.Field name="litterHealth" children={(field) => (
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Health Status</label>
-            <select value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" required>
+            <select value={field.state.value} onBlur={field.handleBlur} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" required>
               <option value="Healthy">Healthy</option>
               <option value="Complications">Complications</option>
               <option value="Stillborn">Stillborn</option>
@@ -115,16 +117,20 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Pups ({field.state.value.length})</label>
-              <button type="button" onClick={() => field.handleChange([...field.state.value, { id: uuidv4(), name: `Pup ${field.state.value.length + 1}` }])} className="text-emerald-600 font-bold text-xs flex items-center gap-1"><Plus size={14} /> Add Pup</button>
+              <button type="button" onClick={() => field.handleChange([...field.state.value, { id: uuidv4(), name: `Pup ${field.state.value.length + 1}` }])} className="text-emerald-600 font-bold text-xs flex items-center gap-1 hover:text-emerald-800 transition-colors">
+                <Plus size={14} /> Add Pup
+              </button>
             </div>
             {field.state.value.map((pup, index) => (
               <div key={pup.id} className="flex gap-2">
-                <input type="text" value={pup.name} onChange={e => {
+                <input type="text" value={pup.name} onBlur={field.handleBlur} onChange={e => {
                   const newPups = [...field.state.value];
                   newPups[index].name = e.target.value;
                   field.handleChange(newPups);
-                }} className="flex-1 p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" />
-                <button type="button" onClick={() => field.handleChange(field.state.value.filter(p => p.id !== pup.id))} className="p-3 text-red-500"><Trash2 size={16} /></button>
+                }} className="flex-1 p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" placeholder="e.g. Unnamed Pup 1" />
+                <button type="button" onClick={() => field.handleChange(field.state.value.filter(p => p.id !== pup.id))} className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                  <Trash2 size={16} />
+                </button>
               </div>
             ))}
           </div>
@@ -134,15 +140,17 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
       <form.Field name="notes" children={(field) => (
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Notes (Optional)</label>
-          <textarea value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" />
+          <textarea value={field.state.value} onBlur={field.handleBlur} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" />
         </div>
       )} />
       
       <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-        <button type="button" onClick={onCancel} className="px-6 py-3 bg-white border-2 text-slate-600 rounded-xl font-bold uppercase text-xs">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2">
-          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
-        </button>
+        <button type="button" onClick={onCancel} className="px-6 py-3 bg-white border-2 text-slate-600 rounded-xl font-bold uppercase text-xs hover:bg-slate-50 transition-colors">Cancel</button>
+        <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]} children={([canSubmit, isSubmitting]) => (
+          <button type="submit" disabled={!canSubmit || isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2 disabled:opacity-50 shadow-sm">
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
+          </button>
+        )} />
       </div>
     </form>
   );

@@ -77,9 +77,11 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
 
   const handleSaveLog = async (entry: Partial<LogEntry>) => {
     try {
-      if (selectedLog) {
-        await updateLogEntry(entry as LogEntry);
+      if (selectedLog && selectedLog.id) {
+        // Explicitly pass the ID as the first parameter to match the hook signature
+        await updateLogEntry(selectedLog.id, { ...selectedLog, ...entry });
       } else {
+        if (!entry.id) entry.id = uuidv4();
         await addLogEntry(entry);
       }
       setIsAddModalOpen(false);

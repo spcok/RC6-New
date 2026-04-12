@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useForm } from '@tanstack/react-form';
+import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 import { Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,8 +24,8 @@ interface FeedFormProps {
 }
 
 export default function FeedForm({ animal, date, userInitials, existingLog, foodTypes, onSave, onCancel }: FeedFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
+  // Removed manual isSubmitting state
+  
   const form = useForm({
     defaultValues: {
       feedItems: (() => {
@@ -44,20 +45,25 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
       })(),
       userNotes: existingLog?.notes ? (JSON.parse(existingLog.notes).userNotes || '') : ''
     },
+    validatorAdapter: zodValidator(),
+    validators: {
+      onChange: feedSchema,
+    },
     onSubmit: async ({ value }) => {
-      setIsSubmitting(true);
       try {
-        const safePayload = feedSchema.parse(value);
-        const finalValue = safePayload.feedItems.map(item => `${item.type} - ${item.quantity}`).join(', ');
+        const finalValue = value.feedItems
+          .filter(item => item.type && item.quantity) // Prevent empty rows from corrupting the string
+          .map(item => `${item.type} - ${item.quantity}`)
+          .join(', ');
         
         const payload: Partial<LogEntry> = {
           id: existingLog?.id || uuidv4(),
-          animal_id: animal.id,
-          log_type: LogType.FEED,
-          log_date: date,
-          user_initials: userInitials,
+          animalId: animal.id,
+          logType: LogType.FEED,
+          logDate: date,
+          userInitials: userInitials,
           value: finalValue,
-          notes: JSON.stringify({ cast: safePayload.cast, feedTime: safePayload.feedTime, userNotes: safePayload.userNotes || '' })
+          notes: JSON.stringify({ cast: value.cast, feedTime: value.feedTime, userNotes: value.userNotes || '' })
         };
         await onSave(payload);
         onCancel(); // Force modal to close on success
@@ -68,8 +74,6 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
         } else {
           alert('Failed to save log');
         }
-      } finally {
-        setIsSubmitting(false);
       }
     }
   });
@@ -81,7 +85,7 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Feed Items</label>
           {field.state.value.map((item, index) => (
             <div key={index} className="flex gap-2">
-              <select value={item.type} onChange={e => {
+              <select value={item.type} onBlur={field.handleBlur} onChange={e => {
                 const newItems = [...field.state.value];
                 newItems[index].type = e.target.value;
                 field.handleChange(newItems);
@@ -89,17 +93,17 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
                 <option value="">Select Food</option>
                 {foodTypes.map(f => <option key={f.id} value={f.value}>{f.value}</option>)}
               </select>
-              <input type="text" value={item.quantity} onChange={e => {
+              <input type="text" value={item.quantity} onBlur={field.handleBlur} onChange={e => {
                 const newItems = [...field.state.value];
                 newItems[index].quantity = e.target.value;
                 field.handleChange(newItems);
               }} placeholder="Qty" className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
-              <button type="button" onClick={() => field.handleChange(field.state.value.filter((_, i) => i !== index))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+              <button type="button" onClick={() => field.handleChange(field.state.value.filter((_, i) => i !== index))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                 <Trash2 size={16} />
               </button>
             </div>
           ))}
-          <button type="button" onClick={() => field.handleChange([...field.state.value, { type: '', quantity: '' }])} className="text-xs font-bold text-blue-600 flex items-center gap-1">
+          <button type="button" onClick={() => field.handleChange([...field.state.value, { type: '', quantity: '' }])} className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
             <Plus size={14} /> Add Item
           </button>
         </div>
@@ -109,13 +113,13 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
         <form.Field name="cast" children={(field) => (
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Cast</label>
-            <input type="text" value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+            <input type="text" value={field.state.value} onBlur={field.handleBlur} onChange={e => field.handleChange(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
           </div>
         )} />
         <form.Field name="feedTime" children={(field) => (
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Time</label>
-            <input type="time" value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+            <input type="time" value={field.state.value} onBlur={field.handleBlur} onChange={e => field.handleChange(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
           </div>
         )} />
       </div>
@@ -123,15 +127,17 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
       <form.Field name="userNotes" children={(field) => (
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Notes (Optional)</label>
-          <textarea value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" />
+          <textarea value={field.state.value} onBlur={field.handleBlur} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl" />
         </div>
       )} />
       
       <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
         <button type="button" onClick={onCancel} className="px-6 py-3 bg-white border-2 text-slate-600 rounded-xl font-bold uppercase text-xs">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2">
-          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
-        </button>
+        <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]} children={([canSubmit, isSubmitting]) => (
+          <button type="submit" disabled={!canSubmit || isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2 disabled:opacity-50">
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
+          </button>
+        )} />
       </div>
     </form>
   );

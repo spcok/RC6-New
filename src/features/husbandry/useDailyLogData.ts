@@ -42,7 +42,8 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
         isDeleted: false,
         ...entry
     }), 
-    updateLogEntry: (id: string, entry: Partial<LogEntry>) => dailyLogsCollection.update(id, entry),
+    // FIX: Passing an updater callback instead of a raw object to prevent the DB crash
+    updateLogEntry: (id: string, entry: Partial<LogEntry>) => dailyLogsCollection.update(id, (old: LogEntry) => ({ ...old, ...entry })),
     deleteLogEntry: (id: string) => dailyLogsCollection.delete(id),
     dailyLogs, 
     isLoading: animalsLoading || logsLoading

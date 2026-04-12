@@ -33,7 +33,7 @@ const DailyLog: React.FC = () => {
   const [hideSubAccounts, setHideSubAccounts] = useState(true);
   const isProcessing = useRef<Set<string>>(new Set());
   
-  const { animals, getTodayLog, addLogEntry, isLoading } = useDailyLogData(viewDate, activeCategory);
+  const { animals, getTodayLog, addLogEntry, updateLogEntry, isLoading } = useDailyLogData(viewDate, activeCategory);
   const { isSyncing } = useWeatherSync();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -207,8 +207,15 @@ const DailyLog: React.FC = () => {
             if (entry.animalId && isProcessing.current.has(entry.animalId)) return;
             if (entry.animalId) isProcessing.current.add(entry.animalId);
             try {
-              if (!entry.id) entry.id = uuidv4();
-              await addLogEntry(entry as LogEntry);
+              const existingLog = getTodayLog(selectedAnimal.id, selectedType);
+              if (existingLog && existingLog.id) {
+                // EDIT MODE: Update the existing record using its ID
+                await updateLogEntry(existingLog.id, { ...existingLog, ...entry } as LogEntry);
+              } else {
+                // ADD MODE: Insert a new record
+                if (!entry.id) entry.id = uuidv4();
+                await addLogEntry(entry as LogEntry);
+              }
               setIsModalOpen(false);
             } finally {
               if (entry.animalId) isProcessing.current.delete(entry.animalId);

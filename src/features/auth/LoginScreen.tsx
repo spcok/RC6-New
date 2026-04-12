@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { useForm } from '@tanstack/react-form';
+import { zodValidator } from '@tanstack/zod-form-adapter';
+import { z } from 'zod';
 import { useAuthStore } from '../../store/authStore';
 import { Loader2, ShieldCheck, Mail, Lock, Bird } from 'lucide-react';
 import { motion } from 'motion/react';
 
+const loginSchema = z.object({
+  email: z.string().min(1, 'Email is required').email('Invalid email address'),
+  password: z.string().min(1, 'Secure PIN / Password is required')
+});
+
 const LoginScreen: React.FC = () => {
   const { login, isLoading, currentUser } = useAuthStore();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Auto-redirect if they hit the /login URL but are already authenticated
@@ -18,17 +24,26 @@ const LoginScreen: React.FC = () => {
     }
   }, [currentUser, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError(null);
-    try {
-      await login(email, password);
-      // Explicitly push the router to the dashboard upon success
-      navigate({ to: '/dashboard', replace: true });
-    } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : 'Authentication failed. Please check your credentials.');
+  const form = useForm({
+    defaultValues: {
+      email: '',
+      password: ''
+    },
+    validatorAdapter: zodValidator(),
+    validators: {
+      onChange: loginSchema,
+    },
+    onSubmit: async ({ value }) => {
+      setLocalError(null);
+      try {
+        await login(value.email, value.password);
+        // Explicitly push the router to the dashboard upon success
+        navigate({ to: '/dashboard', replace: true });
+      } catch (err: unknown) {
+        setLocalError(err instanceof Error ? err.message : 'Authentication failed. Please check your credentials.');
+      }
     }
-  };
+  });
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 relative overflow-hidden">
@@ -55,44 +70,50 @@ const LoginScreen: React.FC = () => {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                Staff Email
-              </label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-emerald-500 transition-colors">
-                  <Mail size={18} />
+          <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }} className="space-y-6">
+            <form.Field name="email" children={(field) => (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                  Staff Email
+                </label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-emerald-500 transition-colors">
+                    <Mail size={18} />
+                  </div>
+                  <input
+                    type="email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="name@kentowlacademy.com"
+                    className={`block w-full pl-12 pr-4 py-4 bg-slate-950/50 border rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all ${field.state.meta.errors.length ? 'border-rose-500/50 focus:border-rose-500/50' : 'border-white/5 focus:border-emerald-500/50'}`}
+                  />
                 </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@kentowlacademy.com"
-                  className="block w-full pl-12 pr-4 py-4 bg-slate-950/50 border border-white/5 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
-                />
+                {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-rose-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
               </div>
-            </div>
+            )} />
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                Secure PIN
-              </label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-emerald-500 transition-colors">
-                  <Lock size={18} />
+            <form.Field name="password" children={(field) => (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                  Secure PIN
+                </label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-emerald-500 transition-colors">
+                    <Lock size={18} />
+                  </div>
+                  <input
+                    type="password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="••••••••"
+                    className={`block w-full pl-12 pr-4 py-4 bg-slate-950/50 border rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all tracking-widest ${field.state.meta.errors.length ? 'border-rose-500/50 focus:border-rose-500/50' : 'border-white/5 focus:border-emerald-500/50'}`}
+                  />
                 </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="block w-full pl-12 pr-4 py-4 bg-slate-950/50 border border-white/5 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
-                />
+                {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-rose-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
               </div>
-            </div>
+            )} />
 
             {localError && (
               <motion.div 
@@ -104,23 +125,29 @@ const LoginScreen: React.FC = () => {
               </motion.div>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/50 disabled:text-emerald-500/50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-emerald-900/20 active:scale-[0.98] flex items-center justify-center gap-3"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <ShieldCheck size={18} />
-                  Sign In
-                </>
-              )}
-            </button>
+            <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]} children={([canSubmit, isSubmitting]) => {
+              // We combine the form's local submission state with your global Auth Store loading state
+              const isBusy = isSubmitting || isLoading;
+              return (
+                <button
+                  type="submit"
+                  disabled={!canSubmit || isBusy}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/50 disabled:text-emerald-500/50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-emerald-900/20 active:scale-[0.98] flex items-center justify-center gap-3"
+                >
+                  {isBusy ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={18} />
+                      Sign In
+                    </>
+                  )}
+                </button>
+              );
+            }} />
           </form>
 
           {/* Network Awareness Indicator */}

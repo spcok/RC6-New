@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from '@tanstack/react-form';
-import { X, AlertCircle } from 'lucide-react';
+import { zodValidator } from '@tanstack/zod-form-adapter';
+import { X, AlertCircle, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { User, UserRole } from '../../../types';
 import { SignatureCapture } from '../../../components/ui/SignatureCapture';
@@ -30,17 +31,20 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
   
   const [isCapturingSignature, setIsCapturingSignature] = useState(false);
   const [currentSignature, setCurrentSignature] = useState<string | undefined>();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
-      name: '',
-      email: '',
-      role: UserRole.VOLUNTEER,
-      initials: '',
+      name: initialData?.name || '',
+      email: initialData?.email || '',
+      role: initialData?.role || UserRole.VOLUNTEER,
+      initials: initialData?.initials || '',
       password: '',
-      pin: '',
+      pin: initialData?.pin || '',
+    },
+    validatorAdapter: zodValidator(),
+    validators: {
+      onChange: userSchema,
     },
     onSubmit: async ({ value }) => {
       if (!navigator.onLine) {
@@ -49,11 +53,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
       }
 
       setGlobalError(null);
-      setIsSubmitting(true);
       
       try {
-        const data = userSchema.parse(value);
-        
         let integritySeal = undefined;
         if (currentSignature) {
           const recordId = initialData?.id || 'NEW_RECORD';
@@ -68,30 +69,21 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
         }
 
         const cleanData = {
-          name: data.name,
-          email: data.email,
-          role: data.role,
-          initials: data.initials.toUpperCase(),
-          pin: data.pin,
-          password: data.password || undefined,
+          name: value.name,
+          email: value.email,
+          role: value.role,
+          initials: value.initials.toUpperCase(),
+          pin: value.pin,
+          password: value.password || undefined,
           signature_data: currentSignature,
           integrity_seal: integritySeal
         };
 
         if (initialData && onSave) {
-          // --- EDIT MODE ---
-          try {
-            await onSave(cleanData);
-          } catch (err: unknown) {
-            if (err instanceof Error && err.message?.includes('integrity_seal')) {
-              console.error('⚠️ [SCHEMA] Missing integrity_seal column.');
-            }
-            throw err;
-          }
+          await onSave(cleanData);
           onSuccess();
           onClose();
         } else {
-          // --- CREATE MODE ---
           if (!cleanData.password) throw new Error('Password is required for new accounts.');
           
           const profileData = {
@@ -106,7 +98,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
           if (onAdd) {
             await onAdd({ email: cleanData.email, password: cleanData.password, profileData });
           } else {
-            // Fallback to direct invoke if onAdd not provided
             const { data: response, error } = await supabase.functions.invoke('create-staff-account', {
               body: { email: cleanData.email, password: cleanData.password, profileData: profileData }
             });
@@ -115,15 +106,12 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
             if (response?.error) throw new Error(response.error);
           }
 
-          // Notify parent to fetch fresh data from cloud
           onSuccess();
           onClose();
         }
       } catch (error: unknown) {
         setGlobalError(error instanceof Error ? error.message : "An unexpected error occurred.");
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      } finally {
-        setIsSubmitting(false);
       }
     }
   });
@@ -156,7 +144,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
           <div>
             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{initialData ? 'Edit Staff Member' : 'Add Staff Member'}</h3>
           </div>
-          <button onClick={onClose} disabled={isSubmitting} className="p-2 hover:bg-slate-200 rounded-full transition-colors disabled:opacity-50">
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
             <X size={20} className="text-slate-500" />
           </button>
         </div>
@@ -177,20 +165,23 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
               <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-slate-100 pb-2">Account Details</h4>
               <form.Field name="name" children={(field) => (
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Full Name</label>
-                  <input value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900" placeholder="e.g. John Smith" />
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Full Name *</label>
+                  <input value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`w-full p-4 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-100 focus:border-indigo-500'}`} placeholder="e.g. John Smith" />
+                  {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
                 </div>
               )} />
               <form.Field name="email" children={(field) => (
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email Address</label>
-                  <input value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900" placeholder="e.g. john@kentowlacademy.com" />
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email Address *</label>
+                  <input value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`w-full p-4 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-100 focus:border-indigo-500'}`} placeholder="e.g. john@kentowlacademy.com" />
+                  {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
                 </div>
               )} />
               <form.Field name="initials" children={(field) => (
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Initials (Max 3)</label>
-                  <input value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900 uppercase" placeholder="JS" />
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Initials (Max 3) *</label>
+                  <input value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`w-full p-4 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 uppercase ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-100 focus:border-indigo-500'}`} placeholder="JS" />
+                  {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
                 </div>
               )} />
             </div>
@@ -199,8 +190,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
               <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-slate-100 pb-2">Access & Security</h4>
               <form.Field name="role" children={(field) => (
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">System Role</label>
-                  <select value={field.state.value} onChange={(e) => field.handleChange(e.target.value as UserRole)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900 appearance-none cursor-pointer">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">System Role *</label>
+                  <select value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value as UserRole)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900 appearance-none cursor-pointer">
                     <option value={UserRole.VOLUNTEER}>Volunteer</option>
                     <option value={UserRole.KEEPER}>Keeper</option>
                     <option value={UserRole.SENIOR_KEEPER}>Senior Keeper</option>
@@ -211,15 +202,16 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
               )} />
               <form.Field name="pin" children={(field) => (
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Daily PIN (Up to 6 Digits)</label>
-                  <input type="password" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} maxLength={6} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900 tracking-[0.5em]" placeholder="••••••" />
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Daily PIN (Up to 6 Digits) *</label>
+                  <input type="password" value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} maxLength={6} className={`w-full p-4 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 tracking-[0.5em] ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-100 focus:border-indigo-500'}`} placeholder="••••••" />
+                  {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
                 </div>
               )} />
               {!initialData && (
                 <form.Field name="password" children={(field) => (
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Login Password</label>
-                    <input type="password" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900" placeholder="••••••••" />
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Login Password *</label>
+                    <input type="password" value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-900" placeholder="••••••••" />
                   </div>
                 )} />
               )}
@@ -251,10 +243,16 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, initialD
           </div>
 
           <div className="mt-8 pt-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="px-8 py-4 border-2 border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-w-[180px]">
-              {isSubmitting ? 'Saving...' : (initialData ? 'Update Profile' : 'Create Account')}
-            </button>
+            <button type="button" onClick={onClose} className="px-8 py-4 border-2 border-slate-100 rounded-2xl font-black uppercase text-[10px] tracking-widest text-slate-500 hover:bg-slate-50 transition-all">Cancel</button>
+            <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]} children={([canSubmit, isSubmitting]) => (
+              <button 
+                type="submit" 
+                disabled={!canSubmit || isSubmitting} 
+                className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-w-[180px] flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (initialData ? 'Update Profile' : 'Create Account')}
+              </button>
+            )} />
           </div>
         </form>
       </div>

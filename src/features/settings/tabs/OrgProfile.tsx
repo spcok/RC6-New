@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from '@tanstack/react-form';
-import * as z from 'zod';
+import { zodValidator } from '@tanstack/zod-form-adapter';
+import { z } from 'zod';
 import { useOrgSettings } from '../useOrgSettings';
 import { supabase } from '../../../lib/supabase';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
-const schema = z.object({
+const orgSchema = z.object({
   id: z.string().optional(),
   orgName: z.string().min(1, 'Organisation Name is required'),
   logoUrl: z.string().optional().nullable(),
@@ -20,39 +21,55 @@ const schema = z.object({
 const OrgProfile: React.FC = () => {
   const { settings, isLoading, saveSettings } = useOrgSettings();
   const [isUploading, setIsUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const form = useForm({
-    defaultValues: settings,
+    defaultValues: {
+      id: settings?.id || '',
+      orgName: settings?.orgName || '',
+      logoUrl: settings?.logoUrl || '',
+      contactEmail: settings?.contactEmail || '',
+      contactPhone: settings?.contactPhone || '',
+      address: settings?.address || '',
+      zlaLicenseNumber: settings?.zlaLicenseNumber || '',
+      officialWebsite: settings?.officialWebsite || '',
+      adoptionPortal: settings?.adoptionPortal || ''
+    },
+    validatorAdapter: zodValidator(),
+    validators: {
+      onChange: orgSchema,
+    },
     onSubmit: async ({ value }) => {
-      setIsSaving(true);
       try {
-        const data = schema.parse(value);
-        await saveSettings(data as any);
+        await saveSettings(value as any);
         showToast('Settings saved successfully!', 'success');
       } catch (error) {
         console.error('Validation/Save failed:', error);
-        showToast('Validation failed. Check required fields.', 'error');
-      } finally {
-        setIsSaving(false);
+        showToast('Save failed. Check network connection.', 'error');
       }
     }
   });
 
-  // Hydrate form when data arrives
   useEffect(() => {
     if (settings && !isLoading) {
-      form.reset(settings);
+      form.reset({
+        id: settings.id || '',
+        orgName: settings.orgName || '',
+        logoUrl: settings.logoUrl || '',
+        contactEmail: settings.contactEmail || '',
+        contactPhone: settings.contactPhone || '',
+        address: settings.address || '',
+        zlaLicenseNumber: settings.zlaLicenseNumber || '',
+        officialWebsite: settings.officialWebsite || '',
+        adoptionPortal: settings.adoptionPortal || ''
+      });
     }
-  }, [settings, isLoading]);
+  }, [settings, isLoading, form]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
-
-  const logoUrl = form.state.values.logoUrl;
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -84,7 +101,7 @@ const OrgProfile: React.FC = () => {
     }
   };
 
-  if (isLoading) return <div className="p-6 text-slate-500 font-medium">Loading organization profile...</div>;
+  if (isLoading) return <div className="p-6 text-slate-500 font-medium flex items-center gap-2"><Loader2 className="animate-spin" size={16}/> Loading organization profile...</div>;
 
   return (
     <div className="relative">
@@ -96,29 +113,34 @@ const OrgProfile: React.FC = () => {
       )}
       <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }} className="space-y-6">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex gap-6">
+          <div className="flex flex-col md:flex-row gap-6">
             <div className="w-48 h-48 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center overflow-hidden bg-slate-50 shrink-0">
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-              ) : (
-                <span className="text-slate-400 text-sm">No Logo</span>
-              )}
+              <form.Subscribe selector={(state) => state.values.logoUrl} children={(logoUrl) => (
+                logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="text-slate-400 text-sm font-bold">No Logo</span>
+                )
+              )} />
             </div>
+            
             <div className="flex-1 space-y-4">
-              <input type="file" onChange={handleLogoUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              {isUploading && <p className="text-sm text-blue-500">Uploading...</p>}
+              <input type="file" accept="image/*" onChange={handleLogoUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors cursor-pointer" />
+              {isUploading && <p className="text-sm font-bold text-blue-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin"/> Uploading to Supabase...</p>}
               
               <div className="grid grid-cols-1 gap-4">
                 <form.Field name="orgName" children={(field) => (
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Academy Name</label>
-                    <input value={field.state.value || ''} onChange={(e) => field.handleChange(e.target.value)} className="mt-1 block w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50" />
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Academy Name *</label>
+                    <input value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`block w-full border-2 rounded-lg p-2.5 bg-slate-50 outline-none font-bold text-sm transition-colors ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'}`} />
+                    {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
                   </div>
                 )} />
                 <form.Field name="zlaLicenseNumber" children={(field) => (
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Zoo Licence Number</label>
-                    <input value={field.state.value || ''} onChange={(e) => field.handleChange(e.target.value)} className="mt-1 block w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50" />
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Zoo Licence Number *</label>
+                    <input value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`block w-full border-2 rounded-lg p-2.5 bg-slate-50 outline-none font-bold text-sm transition-colors ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'}`} />
+                    {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
                   </div>
                 )} />
               </div>
@@ -128,47 +150,52 @@ const OrgProfile: React.FC = () => {
           <div className="mt-6">
             <form.Field name="address" children={(field) => (
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Headquarters Address</label>
-                <textarea value={field.state.value || ''} onChange={(e) => field.handleChange(e.target.value)} className="mt-1 block w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50" />
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Headquarters Address *</label>
+                <textarea value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`block w-full border-2 rounded-lg p-2.5 bg-slate-50 outline-none font-bold text-sm transition-colors resize-none ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'}`} rows={3} />
+                {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
               </div>
             )} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <form.Field name="contactEmail" children={(field) => (
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Professional Email</label>
-                <input type="email" value={field.state.value || ''} onChange={(e) => field.handleChange(e.target.value)} className="mt-1 block w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50" />
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Professional Email *</label>
+                <input type="email" value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`block w-full border-2 rounded-lg p-2.5 bg-slate-50 outline-none font-bold text-sm transition-colors ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'}`} />
+                {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
               </div>
             )} />
             <form.Field name="contactPhone" children={(field) => (
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Academy Phone</label>
-                <input value={field.state.value || ''} onChange={(e) => field.handleChange(e.target.value)} className="mt-1 block w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50" />
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Academy Phone *</label>
+                <input value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className={`block w-full border-2 rounded-lg p-2.5 bg-slate-50 outline-none font-bold text-sm transition-colors ${field.state.meta.errors.length ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'}`} />
+                {field.state.meta.errors.length > 0 && <em className="text-[10px] font-bold text-red-500 mt-1 block ml-1">{field.state.meta.errors.join(', ')}</em>}
               </div>
             )} />
             <form.Field name="officialWebsite" children={(field) => (
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Official Website</label>
-                <input value={field.state.value || ''} onChange={(e) => field.handleChange(e.target.value)} className="mt-1 block w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50" />
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Official Website</label>
+                <input value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="block w-full border-2 border-slate-200 rounded-lg p-2.5 bg-slate-50 outline-none font-bold text-sm focus:border-blue-500 transition-colors" />
               </div>
             )} />
             <form.Field name="adoptionPortal" children={(field) => (
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Adoption Portal</label>
-                <input value={field.state.value || ''} onChange={(e) => field.handleChange(e.target.value)} className="mt-1 block w-full border border-slate-200 rounded-lg p-2.5 bg-slate-50" />
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Adoption Portal</label>
+                <input value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="block w-full border-2 border-slate-200 rounded-lg p-2.5 bg-slate-50 outline-none font-bold text-sm focus:border-blue-500 transition-colors" />
               </div>
             )} />
           </div>
         </div>
 
-        <button 
-          type="submit" 
-          disabled={isSaving}
-          className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {isSaving ? 'Saving...' : 'Save Changes'}
-        </button>
+        <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]} children={([canSubmit, isSubmitting]) => (
+          <button 
+            type="submit" 
+            disabled={!canSubmit || isSubmitting}
+            className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all w-full md:w-auto"
+          >
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Save Changes'}
+          </button>
+        )} />
       </form>
     </div>
   );
