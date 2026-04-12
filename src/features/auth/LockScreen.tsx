@@ -1,14 +1,60 @@
 import React, { useState } from 'react';
+import { useForm } from '@tanstack/react-form';
+import { zodValidator } from '@tanstack/zod-form-adapter';
+import { z } from 'zod';
 import { useAuthStore } from '../../store/authStore';
 import { Lock, LogOut, ShieldAlert, Fingerprint } from 'lucide-react';
+
+const lockSchema = z.object({
+  pin: z.string().min(1, 'PIN is required')
+});
 
 const LockScreen: React.FC = () => {
   const currentUser = useAuthStore(s => s.currentUser);
   const isUiLocked = useAuthStore(s => s.isUiLocked);
   const setUiLocked = useAuthStore(s => s.setUiLocked);
   const logout = useAuthStore(s => s.logout);
-  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+
+  const form = useForm({
+    defaultValues: {
+      pin: ''
+    },
+    validatorAdapter: zodValidator(),
+    validators: {
+      onChange: lockSchema,
+    },
+    onSubmit: async ({ value }) => {
+      const userPin = currentUser?.pin;
+      
+      console.log("🔒 LOCK SCREEN DIAGNOSTIC:");
+      console.log("Entered PIN:", value.pin);
+      console.log("currentUser Object in AuthStore:", currentUser);
+      console.log("Expected PIN (currentUser.pin):", userPin);
+      
+      if (!userPin) {
+        // Fallback for legacy users: allow '0000'
+        if (value.pin === '0000') {
+          setUiLocked(false);
+          form.reset();
+          setError('');
+        } else {
+          setError('No PIN set. Use 0000 or contact admin.');
+          form.reset();
+        }
+        return;
+      }
+
+      if (value.pin === userPin) {
+        setUiLocked(false);
+        form.reset();
+        setError('');
+      } else {
+        setError('Incorrect PIN');
+        form.reset();
+      }
+    }
+  });
 
   // If UI is not locked, don't show the screen
   if (!isUiLocked) return null;
@@ -33,7 +79,7 @@ const LockScreen: React.FC = () => {
 
       if (credential) {
         setUiLocked(false);
-        setPin('');
+        form.reset();
         setError('');
       }
     } catch (err: unknown) {
@@ -43,41 +89,6 @@ const LockScreen: React.FC = () => {
       } else {
         setError('Biometric unlock failed. Please use PIN.');
       }
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Fallback for legacy users who don't have a PIN set yet
-    const userPin = currentUser?.pin;
-    
-    console.log("🔒 LOCK SCREEN DIAGNOSTIC:");
-    console.log("Entered PIN:", pin);
-    console.log("currentUser Object in AuthStore:", currentUser);
-    console.log("Expected PIN (currentUser.pin):", userPin);
-    
-    if (!userPin) {
-      // Fallback for legacy users: allow '0000' or just let them in if they are admin
-      // The user said "including a fallback for legacy users".
-      if (pin === '0000') {
-        setUiLocked(false);
-        setPin('');
-        setError('');
-      } else {
-        setError('No PIN set. Use 0000 or contact admin.');
-        setPin('');
-      }
-      return;
-    }
-
-    if (pin === userPin) {
-      setUiLocked(false);
-      setPin('');
-      setError('');
-    } else {
-      setError('Incorrect PIN');
-      setPin('');
     }
   };
 
@@ -95,18 +106,21 @@ const LockScreen: React.FC = () => {
           Enter your security PIN to continue
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="relative">
-            <input
-              type="password"
-              maxLength={6}
-              autoFocus
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-              className="w-full text-center text-5xl p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl tracking-[0.5em] focus:border-slate-900 focus:bg-white outline-none transition-all font-black text-slate-900"
-              placeholder="••••••"
-            />
-          </div>
+        <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }} className="space-y-6">
+          <form.Field name="pin" children={(field) => (
+            <div className="relative">
+              <input
+                type="password"
+                maxLength={6}
+                autoFocus
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value.replace(/\D/g, ''))}
+                className="w-full text-center text-5xl p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl tracking-[0.5em] focus:border-slate-900 focus:bg-white outline-none transition-all font-black text-slate-900"
+                placeholder="••••••"
+              />
+            </div>
+          )} />
           
           {error && (
             <div className="flex items-center justify-center gap-2 text-rose-500 bg-rose-50 p-3 rounded-xl border border-rose-100">
@@ -116,12 +130,15 @@ const LockScreen: React.FC = () => {
           )}
 
           <div className="flex flex-col gap-3">
-            <button 
-              type="submit" 
-              className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-all shadow-xl shadow-slate-200"
-            >
-              Unlock System
-            </button>
+            <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting]} children={([canSubmit, isSubmitting]) => (
+              <button 
+                type="submit" 
+                disabled={!canSubmit || isSubmitting}
+                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-all shadow-xl shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Unlock System
+              </button>
+            )} />
             
             {window.PublicKeyCredential && (
               <button

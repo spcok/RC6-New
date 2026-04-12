@@ -42,8 +42,17 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
         isDeleted: false,
         ...entry
     }), 
-    // FIX: Passing an updater callback instead of a raw object to prevent the DB crash
-    updateLogEntry: (id: string, entry: Partial<LogEntry>) => dailyLogsCollection.update(id, (old: LogEntry) => ({ ...old, ...entry })),
+    // FIX: Safely merge old and new data, strictly protecting the primary key (id)
+    updateLogEntry: (id: string, entry: Partial<LogEntry>) => {
+      return dailyLogsCollection.update(id, (old: LogEntry) => {
+        return { 
+          ...old, 
+          ...entry, 
+          id: old.id, // Strictly protect the primary key
+          updatedAt: new Date().toISOString() // Optional: good practice to track edits
+        };
+      });
+    },
     deleteLogEntry: (id: string) => dailyLogsCollection.delete(id),
     dailyLogs, 
     isLoading: animalsLoading || logsLoading
