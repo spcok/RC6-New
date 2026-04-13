@@ -27,6 +27,8 @@ interface DataTableProps<TData, TValue = unknown> {
   searchPlaceholder?: string;
   onRowClick?: (data: TData) => void;
   defaultSort?: SortingState;
+  sortingState?: SortingState;
+  onSortingChange?: (sorting: SortingState) => void;
   columnVisibility?: VisibilityState;
   enableDragAndDrop?: boolean;
   onReorder?: (draggedItem: TData, targetItem: TData) => void;
@@ -39,14 +41,19 @@ export function DataTable<TData, TValue = unknown>({
   searchPlaceholder = "Search records...",
   onRowClick,
   defaultSort = [],
+  sortingState,
+  onSortingChange,
   columnVisibility = {},
   enableDragAndDrop = false,
   onReorder
 }: DataTableProps<TData, TValue>) {
   const [globalFilter, setGlobalFilter] = useState('');
-  const [sorting, setSorting] = useState<SortingState>(defaultSort);
+  const [internalSorting, setInternalSorting] = useState<SortingState>(defaultSort);
   const [draggedRowIndex, setDraggedRowIndex] = useState<number | null>(null);
   
+  const sorting = sortingState ?? internalSorting;
+  const setSorting = onSortingChange ?? setInternalSorting;
+
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize,
@@ -55,7 +62,7 @@ export function DataTable<TData, TValue = unknown>({
   const defaultSortString = JSON.stringify(defaultSort);
   useEffect(() => {
     if (defaultSort && defaultSort.length > 0) {
-      setSorting(JSON.parse(defaultSortString));
+      setInternalSorting(JSON.parse(defaultSortString));
     }
   }, [defaultSortString, defaultSort]);
 
@@ -152,10 +159,12 @@ export function DataTable<TData, TValue = unknown>({
                       if (!enableDragAndDrop) return;
                       setDraggedRowIndex(row.index);
                       e.dataTransfer.effectAllowed = 'move';
+                      // CRITICAL FIX: The browser requires a data payload to execute the drag
+                      e.dataTransfer.setData('text/plain', row.id);
                     }}
                     onDragOver={(e) => {
                       if (!enableDragAndDrop) return;
-                      e.preventDefault(); 
+                      e.preventDefault(); // Required to allow dropping
                       e.dataTransfer.dropEffect = 'move';
                     }}
                     onDrop={(e) => {
@@ -172,7 +181,14 @@ export function DataTable<TData, TValue = unknown>({
                       if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('.prevent-row-click')) return;
                       onRowClick?.(row.original);
                     }}
-                    className={`transition-colors border-b border-slate-100 bg-white ${onRowClick && !enableDragAndDrop ? 'cursor-pointer hover:bg-slate-50' : 'hover:bg-slate-50'} ${isBeingDragged ? 'opacity-50 bg-emerald-50' : ''}`}
+                    // CRITICAL FIX: Applied 'select-none' and 'cursor-grab' when Reorder Mode is active
+                    className={`transition-colors border-b border-slate-100 bg-white ${
+                      onRowClick && !enableDragAndDrop ? 'cursor-pointer hover:bg-slate-50' : 'hover:bg-slate-50'
+                    } ${
+                      isBeingDragged ? 'opacity-50 bg-emerald-50' : ''
+                    } ${
+                      enableDragAndDrop ? 'select-none cursor-grab active:cursor-grabbing' : ''
+                    }`}
                     style={{ 
                       position: 'absolute', 
                       top: 0, 
