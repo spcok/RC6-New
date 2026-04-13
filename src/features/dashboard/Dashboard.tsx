@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AnimalCategory } from '../../types';
+import { AnimalCategory, Animal, LogEntry } from '../../types';
 import { Heart, AlertCircle, Plus, Calendar, Scale, Drumstick, ArrowUpDown, Loader2, ClipboardCheck, CheckCircle, ChevronUp, ChevronDown, ChevronRight, Lock, Unlock, GripVertical } from 'lucide-react';
 import { formatWeightDisplay, parseLegacyWeightToGrams } from '../../services/weightUtils';
 import AnimalFormModal from '../animals/AnimalFormModal';
@@ -7,6 +7,26 @@ import { useDashboardData, EnhancedAnimal, PendingTask } from './useDashboardDat
 import { usePermissions } from '../../hooks/usePermissions';
 
 import { animalsCollection } from '../../lib/database';
+
+// --- DND-KIT IMPORTS ---
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface DashboardProps {
   onSelectAnimal: (animal: EnhancedAnimal) => void;
@@ -16,6 +36,81 @@ interface DashboardProps {
   setViewDate: (date: string) => void;
 }
 
+// -------------------------------------------------------------
+// SORTABLE ROW COMPONENT
+// -------------------------------------------------------------
+interface SortableRowProps {
+  animal: EnhancedAnimal;
+  activeTab: AnimalCategory | 'ARCHIVED';
+  isReorderingEnabled: boolean;
+  onSelectAnimal: (animal: EnhancedAnimal) => void;
+  getWeightDisplay: (log: LogEntry | undefined, unit: string) => string;
+  isExpandedGroupChild?: boolean;
+}
+
+const SortableAnimalRow: React.FC<SortableRowProps> = ({
+  animal, activeTab, isReorderingEnabled, onSelectAnimal, getWeightDisplay, isExpandedGroupChild
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: animal.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    position: isDragging ? ('relative' as const) : ('static' as const),
+    zIndex: isDragging ? 99 : 'auto',
+    backgroundColor: isDragging ? '#f8fafc' : undefined,
+  };
+
+  return (
+    <tr 
+      ref={setNodeRef} 
+      style={style} 
+      className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpandedGroupChild ? 'bg-slate-50/30' : ''}`} 
+      onClick={() => onSelectAnimal(animal)}
+    >
+      {isReorderingEnabled && (
+        <td className="px-1 py-1 w-16">
+          {/* touch-none prevents page scrolling when the user tries to drag */}
+          <div className="flex items-center justify-center w-full h-full py-2 touch-none cursor-grab active:cursor-grabbing" {...attributes} {...listeners} onClick={(e) => e.stopPropagation()}>
+            <GripVertical size={16} className="text-slate-400 hover:text-blue-600 transition-colors" />
+          </div>
+        </td>
+      )}
+      <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-sm md:text-base font-bold text-slate-900 whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight ${isExpandedGroupChild ? 'pl-4 md:pl-8' : ''}`}>
+        {isExpandedGroupChild && <span className="text-slate-300 mr-2">↳</span>}
+        {animal.name ?? 'Unknown'}
+      </td>
+      <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-nowrap hidden xl:table-cell">{animal.species ?? 'Unknown'}</td>
+      <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap hidden 2xl:table-cell">{animal.displayId ?? 'N/A'}</td>
+      
+      {activeTab === 'ARCHIVED' ? (
+          <>
+              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-nowrap">{animal.dispositionStatus ?? 'Unknown'}</td>
+              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-nowrap">{animal.archivedAt ? new Date(animal.archivedAt).toLocaleDateString('en-GB') : '-'}</td>
+              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-normal">{animal.archiveReason ?? 'Unknown'}</td>
+          </>
+      ) : (
+          <>
+              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>{animal.todayWeight ? getWeightDisplay(animal.todayWeight, animal.weightUnit ?? 'g') : '-'}</td>
+              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap">{animal.todayFeed ? (typeof animal.todayFeed.value === 'string' ? animal.todayFeed.value : String(animal.todayFeed.value ?? 'Fed')) : '-'}</td>
+              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-normal leading-tight min-w-[60px] ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : (activeTab === AnimalCategory.OWLS || activeTab === AnimalCategory.RAPTORS ? '' : 'hidden md:table-cell')}`}>{animal.lastFedStr ?? 'N/A'}</td>
+              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-normal min-w-[90px] ${activeTab === AnimalCategory.EXOTICS ? '' : 'hidden'}`}>
+              {animal.nextFeedTask ? (
+                  <div className="flex flex-col gap-0.5"><span className="font-bold text-slate-800 text-xs uppercase tracking-tight">{new Date(animal.nextFeedTask.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><span className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">{animal.nextFeedTask.notes ?? 'Scheduled'}</span></div>
+              ) : <span className="text-slate-300">-</span>}
+              </td>
+              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-blue-500 whitespace-nowrap hidden md:table-cell">{animal.location ?? 'Unknown'}</td>
+          </>
+      )}
+    </tr>
+  );
+};
+
+
+// -------------------------------------------------------------
+// MAIN DASHBOARD COMPONENT
+// -------------------------------------------------------------
 const Dashboard: React.FC<DashboardProps> = ({ 
     onSelectAnimal, activeTab, setActiveTab, viewDate, setViewDate
 }) => {
@@ -44,39 +139,42 @@ const Dashboard: React.FC<DashboardProps> = ({
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
 
-  // -------------------------------------------------------------
-  // GUARANTEED REORDER ENGINE (The Freeze Pattern)
-  // -------------------------------------------------------------
-  const handleArrowClick = async (animal: EnhancedAnimal, direction: 'up' | 'down', contextRows: EnhancedAnimal[], e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!canManageSystem) return;
+  // Setup DND Sensors (Touch & Mouse optimized)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-      const currentIndex = contextRows.findIndex((a) => a.id === animal.id);
-      if (currentIndex === -1) return;
-      if (direction === 'up' && currentIndex === 0) return;
-      if (direction === 'down' && currentIndex === contextRows.length - 1) return;
+  // Safe Math DND Reorder Handler
+  const handleDragEnd = async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id || !canManageSystem) return;
 
-      const targetAnimal = contextRows[direction === 'up' ? currentIndex - 1 : currentIndex + 1];
-      const updates: Promise<any>[] = [];
+      const activeId = active.id as string;
+      const overId = over.id as string;
 
-      // THE FIX: Check if we need to initialize the group to prevent "Mathematical Jumps"
-      const needsInitialization = contextRows.some(a => a.customOrder === undefined);
-      if (needsInitialization) {
-          contextRows.forEach((a, idx) => {
-              a.customOrder = idx * 10; // Set locally so math below functions
-              updates.push(animalsCollection.update(a.id, (old: any) => ({ ...old, customOrder: idx * 10 })));
-          });
-      }
+      const activeAnimal = filteredAnimals.find(a => a.id === activeId);
+      const overAnimal = filteredAnimals.find(a => a.id === overId);
 
-      const orderA = animal.customOrder ?? (currentIndex * 10);
-      const orderB = targetAnimal.customOrder ?? ((direction === 'up' ? currentIndex - 1 : currentIndex + 1) * 10);
+      if (!activeAnimal || !overAnimal || activeAnimal.parentMobId !== overAnimal.parentMobId) return;
 
-      if (orderA === orderB) {
-          updates.push(animalsCollection.update(animal.id, (old: any) => ({ ...old, customOrder: orderB - 5 })));
-      } else {
-          updates.push(animalsCollection.update(animal.id, (old: any) => ({ ...old, customOrder: orderB })));
-          updates.push(animalsCollection.update(targetAnimal.id, (old: any) => ({ ...old, customOrder: orderA })));
-      }
+      const contextRows = activeAnimal.parentMobId
+          ? filteredAnimals.filter(a => a.parentMobId === activeAnimal.parentMobId)
+          : filteredAnimals.filter(a => !a.parentMobId);
+
+      const oldIndex = contextRows.findIndex(a => a.id === activeId);
+      const newIndex = contextRows.findIndex(a => a.id === overId);
+
+      const newOrder = arrayMove(contextRows, oldIndex, newIndex);
+      const updates: Promise<void>[] = [];
+
+      newOrder.forEach((item, index) => {
+          const exactOrder = index * 10;
+          if (item.customOrder !== exactOrder) {
+              updates.push(animalsCollection.update(item.id, (old: Animal) => ({ ...old, customOrder: exactOrder })));
+          }
+      });
 
       try {
           await Promise.all(updates);
@@ -91,12 +189,17 @@ const Dashboard: React.FC<DashboardProps> = ({
       } else {
           cycleSort(); 
       }
-      
-      if (val !== 'custom') {
-          toggleOrderLock(true);
-      }
+      if (val !== 'custom') toggleOrderLock(true);
       setIsDropdownOpen(false);
   };
+
+  const getSortLabel = () => {
+    if (sortOption === 'alpha-asc') return 'Name (A-Z)';
+    if (sortOption === 'alpha-desc') return 'Name (Z-A)';
+    if (sortOption === 'location-asc') return 'Location (A-Z)';
+    if (sortOption === 'location-desc') return 'Location (Z-A)';
+    return 'Curated Order';
+  }
 
 
   if (!permissions.view_animals) {
@@ -105,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 flex flex-col items-center gap-2 max-w-md text-center">
           <Lock size={48} className="opacity-50" />
           <h2 className="text-lg font-bold uppercase tracking-tight">Access Restricted</h2>
-          <p className="text-sm font-medium">You do not have permission to view the animal directory. Please contact your administrator.</p>
+          <p className="text-sm font-medium">You do not have permission to view the animal directory.</p>
         </div>
       </div>
     );
@@ -118,17 +221,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (grams !== null && !isNaN(grams)) return formatWeightDisplay(grams, targetUnit as 'g' | 'kg' | 'oz' | 'lbs_oz');
       if (log.weight) return `${log.weight}${log.weightUnit || 'g'}`;
       return typeof log.value === 'string' ? log.value : String(log.value || '-');
-  };
-
-  const getSafeDate = (dateStr?: string | Date | null) => {
-      if (!dateStr) return 'N/A';
-      try {
-          const d = new Date(dateStr);
-          if (isNaN(d.getTime())) return 'N/A';
-          return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      } catch {
-          return 'N/A';
-      }
   };
 
   if (isLoading) {
@@ -180,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                       <p className="text-xs font-medium text-slate-900 leading-tight truncate">{t.title}</p>
                                       <div className="flex items-center gap-1.5 mt-0.5">
                                         <Calendar size={10} className="text-slate-400" />
-                                        <p className="text-[10px] text-slate-500">Due: {getSafeDate(t.dueDate)}</p>
+                                        <p className="text-[10px] text-slate-500">Due: {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
                                       </div>
                                   </div>
                               </div>
@@ -222,7 +314,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                       <p className="text-xs font-medium text-slate-900 leading-tight truncate">{t.title}</p>
                                       <div className="flex items-center gap-1.5 mt-0.5">
                                         <Calendar size={10} className="text-slate-400" />
-                                        <p className="text-[10px] text-slate-500">Mandatory: {getSafeDate(t.dueDate)}</p>
+                                        <p className="text-[10px] text-slate-500">Mandatory: {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
                                       </div>
                                   </div>
                               </div>
@@ -290,7 +382,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] lg:text-xs font-medium hover:bg-slate-50 text-slate-700 bg-white min-w-[80px]"
               >
                 <ArrowUpDown size={14} /> 
-                {sortOption === 'alpha-asc' ? 'Name (A-Z)' : sortOption === 'alpha-desc' ? 'Name (Z-A)' : 'Curated Order'}
+                {getSortLabel()}
               </button>
               
               {isDropdownOpen && (
@@ -299,6 +391,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col py-1">
                     <button onClick={() => handleSortSelect('alpha-asc')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'alpha-asc' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Name (A-Z)</button>
                     <button onClick={() => handleSortSelect('alpha-desc')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'alpha-desc' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Name (Z-A)</button>
+                    <button onClick={() => handleSortSelect('location-asc')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'location-asc' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Location (A-Z)</button>
+                    <button onClick={() => handleSortSelect('location-desc')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'location-desc' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Location (Z-A)</button>
                     {activeTab !== 'ARCHIVED' && (
                         <button onClick={() => handleSortSelect('custom')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'custom' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Curated Order</button>
                     )}
@@ -349,163 +443,116 @@ const Dashboard: React.FC<DashboardProps> = ({
         <h2 className="text-lg lg:text-2xl font-semibold text-slate-800">Your {activeTab ? (activeTab.charAt(0) + activeTab.slice(1).toLowerCase()) : 'Animals'}</h2>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="w-full overflow-x-auto overflow-y-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-white border-b border-slate-200 text-slate-600 font-medium">
-              <tr>
-                {isReorderingEnabled && (
-                  <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap w-16">Move</th>
-                )}
-                <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight">Name</th>
-                <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden xl:table-cell">Species</th>
-                <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden 2xl:table-cell">Ring/Microchip</th>
-                {activeTab === 'ARCHIVED' ? (
-                    <>
-                        <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Status</th>
-                        <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Date Archived</th>
-                        <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Reason</th>
-                    </>
-                ) : (
-                    <>
-                        <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>Today's Weight</th>
-                        <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Today's Feed</th>
-                        <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-normal leading-tight ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : (activeTab === AnimalCategory.OWLS || activeTab === AnimalCategory.RAPTORS ? '' : 'hidden md:table-cell')}`}>Last Fed</th>
-                        <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? '' : 'hidden'}`}>Next Feed</th>
-                        <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden md:table-cell">Location</th>
-                    </>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {(() => {
-                const grouped = new Map<string, EnhancedAnimal[]>();
-                const standalone: EnhancedAnimal[] = [];
-                
-                (filteredAnimals || []).forEach((animal: EnhancedAnimal) => {
-                  if (animal.parentMobId) {
-                    if (!grouped.has(animal.parentMobId)) {
-                      grouped.set(animal.parentMobId, []);
-                    }
-                    grouped.get(animal.parentMobId)!.push(animal);
-                  } else {
-                    standalone.push(animal);
-                  }
-                });
-
-                const rows: React.ReactNode[] = [];
-
-                Array.from(grouped.entries()).forEach(([parentMobId, animals]: [string, EnhancedAnimal[]]) => {
-                  const isExpanded = expandedGroups[parentMobId];
-                  const parentMob = standalone.find((a: EnhancedAnimal) => a.id === parentMobId);
-                  const displayName = parentMob ? parentMob.name : 'Unknown Group';
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="w-full overflow-x-auto overflow-y-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-white border-b border-slate-200 text-slate-600 font-medium">
+                <tr>
+                  {isReorderingEnabled && (
+                    <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap w-16">Move</th>
+                  )}
+                  <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight">Name</th>
+                  <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden xl:table-cell">Species</th>
+                  <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden 2xl:table-cell">Ring/Microchip</th>
+                  {activeTab === 'ARCHIVED' ? (
+                      <>
+                          <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Status</th>
+                          <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Date Archived</th>
+                          <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Reason</th>
+                      </>
+                  ) : (
+                      <>
+                          <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>Today's Weight</th>
+                          <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap">Today's Feed</th>
+                          <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-normal leading-tight ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : (activeTab === AnimalCategory.OWLS || activeTab === AnimalCategory.RAPTORS ? '' : 'hidden md:table-cell')}`}>Last Fed</th>
+                          <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? '' : 'hidden'}`}>Next Feed</th>
+                          <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden md:table-cell">Location</th>
+                      </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {(() => {
+                  const grouped = new Map<string, EnhancedAnimal[]>();
+                  const standalone: EnhancedAnimal[] = [];
                   
-                  rows.push(
-                    <tr key={`group-${parentMobId}`} className="bg-slate-100/50 border-y border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => toggleGroup(parentMobId)}>
-                      <td colSpan={isReorderingEnabled ? 10 : 9} className="px-2 py-3 lg:px-4 lg:py-4">
-                        <div className="flex items-center gap-2">
-                          {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
-                          <span className="font-bold text-slate-800">{displayName}</span>
-                          <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">{animals.length} individuals</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
+                  (filteredAnimals || []).forEach((animal: EnhancedAnimal) => {
+                    if (animal.parentMobId) {
+                      if (!grouped.has(animal.parentMobId)) {
+                        grouped.set(animal.parentMobId, []);
+                      }
+                      grouped.get(animal.parentMobId)!.push(animal);
+                    } else {
+                      standalone.push(animal);
+                    }
+                  });
 
-                  if (isExpanded) {
-                    animals.forEach((animal: EnhancedAnimal) => {
+                  const rows: React.ReactNode[] = [];
+
+                  Array.from(grouped.entries()).forEach(([parentMobId, animals]: [string, EnhancedAnimal[]]) => {
+                    const isExpanded = expandedGroups[parentMobId];
+                    const parentMob = standalone.find((a: EnhancedAnimal) => a.id === parentMobId);
+                    const displayName = parentMob ? parentMob.name : 'Unknown Group';
+                    
+                    rows.push(
+                      <tr key={`group-${parentMobId}`} className="bg-slate-100/50 border-y border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => toggleGroup(parentMobId)}>
+                        <td colSpan={isReorderingEnabled ? 10 : 9} className="px-2 py-3 lg:px-4 lg:py-4">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
+                            <span className="font-bold text-slate-800">{displayName}</span>
+                            <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">{animals.length} individuals</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+
+                    if (isExpanded) {
+                      const itemIds = animals.map(a => a.id);
                       rows.push(
-                        <tr key={animal.id} className="hover:bg-slate-50 transition-colors cursor-pointer bg-slate-50/30" onClick={() => onSelectAnimal(animal)}>
-                          {isReorderingEnabled && (
-                              <td className="px-1 py-1 w-16">
-                                <div className="flex items-center justify-between w-full pr-1 prevent-row-click select-none">
-                                  <div className="text-slate-300 hidden sm:block"><GripVertical size={14} /></div>
-                                  <div className="flex flex-col items-center justify-center">
-                                    <button onClick={(e) => handleArrowClick(animal, 'up', animals, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronUp size={16} strokeWidth={3} /></button>
-                                    <button onClick={(e) => handleArrowClick(animal, 'down', animals, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronDown size={16} strokeWidth={3} /></button>
-                                  </div>
-                                </div>
-                              </td>
-                          )}
-                          <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-sm md:text-base font-bold text-slate-900 whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight pl-4 md:pl-8">
-                            <span className="text-slate-300 mr-2">↳</span>{animal.name ?? 'Unknown'}
-                          </td>
-                          <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-nowrap hidden xl:table-cell">{animal.species ?? 'Unknown'}</td>
-                          <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap hidden 2xl:table-cell">{animal.displayId ?? 'N/A'}</td>
-                          {activeTab === 'ARCHIVED' ? (
-                              <>
-                                  <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-nowrap">{animal.dispositionStatus ?? 'Unknown'}</td>
-                                  <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-nowrap">{animal.archivedAt ? new Date(animal.archivedAt).toLocaleDateString('en-GB') : '-'}</td>
-                                  <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-normal">{animal.archiveReason ?? 'Unknown'}</td>
-                              </>
-                          ) : (
-                              <>
-                                  <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>{animal.todayWeight ? getWeightDisplay(animal.todayWeight, animal.weightUnit ?? 'g') : '-'}</td>
-                                  <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap">{animal.todayFeed ? (typeof animal.todayFeed.value === 'string' ? animal.todayFeed.value : String(animal.todayFeed.value ?? 'Fed')) : '-'}</td>
-                                  <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-normal leading-tight min-w-[60px] ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : (activeTab === AnimalCategory.OWLS || activeTab === AnimalCategory.RAPTORS ? '' : 'hidden md:table-cell')}`}>{animal.lastFedStr ?? 'N/A'}</td>
-                                  <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-normal min-w-[90px] ${activeTab === AnimalCategory.EXOTICS ? '' : 'hidden'}`}>
-                                  {animal.nextFeedTask ? (
-                                      <div className="flex flex-col gap-0.5"><span className="font-bold text-slate-800 text-xs uppercase tracking-tight">{new Date(animal.nextFeedTask.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><span className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">{animal.nextFeedTask.notes ?? 'Scheduled'}</span></div>
-                                  ) : <span className="text-slate-300">-</span>}
-                                  </td>
-                                  <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-blue-500 whitespace-nowrap hidden md:table-cell">{animal.location ?? 'Unknown'}</td>
-                              </>
-                          )}
-                        </tr>
+                        <SortableContext key={`ctx-${parentMobId}`} items={itemIds} strategy={verticalListSortingStrategy}>
+                          {animals.map((animal: EnhancedAnimal) => (
+                            <SortableAnimalRow 
+                                key={animal.id} 
+                                animal={animal} 
+                                activeTab={activeTab} 
+                                isReorderingEnabled={isReorderingEnabled} 
+                                onSelectAnimal={onSelectAnimal} 
+                                getWeightDisplay={getWeightDisplay} 
+                                isExpandedGroupChild={true} 
+                            />
+                          ))}
+                        </SortableContext>
                       );
-                    });
+                    }
+                  });
+
+                  const standaloneRows = standalone.filter((a: EnhancedAnimal) => !grouped.has(a.id));
+                  if (standaloneRows.length > 0) {
+                      const standaloneIds = standaloneRows.map(a => a.id);
+                      rows.push(
+                        <SortableContext key="ctx-standalone" items={standaloneIds} strategy={verticalListSortingStrategy}>
+                          {standaloneRows.map((animal: EnhancedAnimal) => (
+                            <SortableAnimalRow 
+                                key={animal.id} 
+                                animal={animal} 
+                                activeTab={activeTab} 
+                                isReorderingEnabled={isReorderingEnabled} 
+                                onSelectAnimal={onSelectAnimal} 
+                                getWeightDisplay={getWeightDisplay} 
+                            />
+                          ))}
+                        </SortableContext>
+                      );
                   }
-                });
 
-                const standaloneRows = standalone.filter((a: EnhancedAnimal) => !grouped.has(a.id));
-                standaloneRows.forEach((animal: EnhancedAnimal) => {
-                  rows.push(
-                    <tr key={animal.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onSelectAnimal(animal)}>
-                      {isReorderingEnabled && (
-                          <td className="px-1 py-1 w-16">
-                            <div className="flex items-center justify-between w-full pr-1 prevent-row-click select-none">
-                              <div className="text-slate-300 hidden sm:block"><GripVertical size={14} /></div>
-                              <div className="flex flex-col items-center justify-center">
-                                <button onClick={(e) => handleArrowClick(animal, 'up', standaloneRows, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronUp size={16} strokeWidth={3} /></button>
-                                <button onClick={(e) => handleArrowClick(animal, 'down', standaloneRows, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronDown size={16} strokeWidth={3} /></button>
-                              </div>
-                            </div>
-                          </td>
-                      )}
-                      <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-sm md:text-base font-bold text-slate-900 whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight">
-                        {animal.name ?? 'Unknown'}
-                      </td>
-                      <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-nowrap hidden xl:table-cell">{animal.species ?? 'Unknown'}</td>
-                      <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap hidden 2xl:table-cell">{animal.displayId ?? 'N/A'}</td>
-                      {activeTab === 'ARCHIVED' ? (
-                          <>
-                              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-nowrap">{animal.dispositionStatus ?? 'Unknown'}</td>
-                              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-nowrap">{animal.archivedAt ? new Date(animal.archivedAt).toLocaleDateString('en-GB') : '-'}</td>
-                              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-600 whitespace-normal">{animal.archiveReason ?? 'Unknown'}</td>
-                          </>
-                      ) : (
-                          <>
-                              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>{animal.todayWeight ? getWeightDisplay(animal.todayWeight, animal.weightUnit ?? 'g') : '-'}</td>
-                              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap">{animal.todayFeed ? (typeof animal.todayFeed.value === 'string' ? animal.todayFeed.value : String(animal.todayFeed.value ?? 'Fed')) : '-'}</td>
-                              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-normal leading-tight min-w-[60px] ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : (activeTab === AnimalCategory.OWLS || activeTab === AnimalCategory.RAPTORS ? '' : 'hidden md:table-cell')}`}>{animal.lastFedStr ?? 'N/A'}</td>
-                              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-normal min-w-[90px] ${activeTab === AnimalCategory.EXOTICS ? '' : 'hidden'}`}>
-                              {animal.nextFeedTask ? (
-                                  <div className="flex flex-col gap-0.5"><span className="font-bold text-slate-800 text-xs uppercase tracking-tight">{new Date(animal.nextFeedTask.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><span className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">{animal.nextFeedTask.notes ?? 'Scheduled'}</span></div>
-                              ) : <span className="text-slate-300">-</span>}
-                              </td>
-                              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-blue-500 whitespace-nowrap hidden md:table-cell">{animal.location ?? 'Unknown'}</td>
-                          </>
-                      )}
-                    </tr>
-                  );
-                });
-
-                return rows;
-              })()}
-            </tbody>
-          </table>
+                  return rows;
+                })()}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </DndContext>
       
       {isCreateAnimalModalOpen && (
           <AnimalFormModal isOpen={isCreateAnimalModalOpen} onClose={() => setIsCreateAnimalModalOpen(false)} />

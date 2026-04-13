@@ -86,10 +86,12 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
       );
     }
     
+    // FULL SUITE OF SAFE SORTS
     if (sortOption === 'alpha-asc') result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     if (sortOption === 'alpha-desc') result.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    if (sortOption === 'location-asc') result.sort((a, b) => (a.location || '').localeCompare(b.location || ''));
+    if (sortOption === 'location-desc') result.sort((a, b) => (b.location || '').localeCompare(a.location || ''));
     
-    // CRITICAL FIX: Safer Custom Sorting. Uninitialized items fallback to alphabetical.
     if (sortOption === 'custom') {
         result.sort((a, b) => {
             const orderA = a.customOrder ?? 999999; 
@@ -121,7 +123,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
   }, [liveAnimals, archivedAnimals, activeTab, searchTerm, sortOption, logs, todayLogsFiltered]);
 
   const toggleOrderLock = (locked: boolean) => setIsOrderLocked(locked);
-  const cycleSort = () => setSortOption(prev => prev === 'alpha-asc' ? 'alpha-desc' : prev === 'alpha-desc' ? 'custom' : 'alpha-asc');
+  const cycleSort = () => setSortOption(prev => prev === 'alpha-asc' ? 'alpha-desc' : prev === 'alpha-desc' ? 'location-asc' : prev === 'location-asc' ? 'location-desc' : prev === 'location-desc' ? 'custom' : 'alpha-asc');
 
   return { filteredAnimals, animalStats, taskStats, isLoading, searchTerm, setSearchTerm, sortOption, setSortOption, cycleSort, isOrderLocked, toggleOrderLock };
 }
