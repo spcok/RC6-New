@@ -2,14 +2,15 @@ import React from 'react';
 import { Animal } from '../../../types';
 
 interface WeightFormProps {
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, any>) => void;
   onCancel: () => void;
   isSubmitting: boolean;
   animal: Animal;
-  existingData?: any;
+  existingData?: Record<string, any>;
 }
 
 export default function WeightForm({ onSubmit, onCancel, isSubmitting, animal, existingData }: WeightFormProps) {
+  // Pre-fill with existing data if it exists
   const [weight, setWeight] = React.useState(existingData?.value ? String(existingData.value).replace(/[^0-9.]/g, '') : '');
   const [unit, setUnit] = React.useState(existingData?.weightUnit || animal.weightUnit || 'g');
   const [notes, setNotes] = React.useState(existingData?.notes || '');
@@ -18,8 +19,9 @@ export default function WeightForm({ onSubmit, onCancel, isSubmitting, animal, e
     e.preventDefault();
     if (!weight) return;
     
+    // Spread existingData to persist the 'id' (forces an update instead of insert)
     onSubmit({
-      ...existingData, 
+      ...existingData,
       value: weight,
       weightUnit: unit,
       notes,
