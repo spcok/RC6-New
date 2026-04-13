@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AnimalCategory, Animal, LogEntry } from '../../types';
+import { AnimalCategory } from '../../types';
 import { Heart, AlertCircle, Plus, Calendar, Scale, Drumstick, ArrowUpDown, Loader2, ClipboardCheck, CheckCircle, ChevronUp, ChevronDown, ChevronRight, Lock, Unlock, GripVertical } from 'lucide-react';
 import { formatWeightDisplay, parseLegacyWeightToGrams } from '../../services/weightUtils';
 import AnimalFormModal from '../animals/AnimalFormModal';
@@ -44,7 +44,7 @@ interface SortableRowProps {
   activeTab: AnimalCategory | 'ARCHIVED';
   isReorderingEnabled: boolean;
   onSelectAnimal: (animal: EnhancedAnimal) => void;
-  getWeightDisplay: (log: LogEntry | undefined, unit: string) => string;
+  getWeightDisplay: (log: any, unit: string) => string;
   isExpandedGroupChild?: boolean;
 }
 
@@ -167,12 +167,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       const newIndex = contextRows.findIndex(a => a.id === overId);
 
       const newOrder = arrayMove(contextRows, oldIndex, newIndex);
-      const updates: Promise<void>[] = [];
+      const updates: Promise<any>[] = [];
 
       newOrder.forEach((item, index) => {
           const exactOrder = index * 10;
           if (item.customOrder !== exactOrder) {
-              updates.push(animalsCollection.update(item.id, (old: Animal) => ({ ...old, customOrder: exactOrder })));
+              updates.push(animalsCollection.update(item.id, (old: any) => ({ ...old, customOrder: exactOrder })));
           }
       });
 
