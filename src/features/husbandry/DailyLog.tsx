@@ -1,234 +1,136 @@
-import { useState, useRef } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { Users, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Animal, LogEntry, LogType, AnimalCategory, EntityType } from '../../types';
-import { getUKLocalDate } from '../../services/temporalService';
+import React, { useState } from 'react';
 import { useDailyLogData } from './useDailyLogData';
-import { useWeatherSync } from './hooks/useWeatherSync';
+import { AnimalCategory, LogType } from '../../types';
+import { Search, Loader2 } from 'lucide-react';
 import AddEntryModal from './AddEntryModal';
+import { getUKLocalDate } from '../../services/temporalService';
+
 import { BirdRow } from './components/BirdRow';
 import { MammalRow } from './components/MammalRow';
 import { ExoticRow } from './components/ExoticRow';
 
-const DailyLog: React.FC = () => {
+export default function DailyLog() {
+  const [activeTab, setActiveTab] = useState<AnimalCategory | 'all'>(AnimalCategory.OWLS);
   const [viewDate, setViewDate] = useState(getUKLocalDate());
+  const [searchTerm, setSearchTerm] = useState('');
   
-  const handlePrevDay = () => {
-    const d = new Date(viewDate);
-    d.setDate(d.getDate() - 1);
-    setViewDate(d.toISOString().split('T')[0]);
-  };
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedAnimal, setSelectedAnimal] = useState<any>(null);
 
-  const handleNextDay = () => {
-    const d = new Date(viewDate);
-    d.setDate(d.getDate() + 1);
-    setViewDate(d.toISOString().split('T')[0]);
-  };
+  const { animals, getTodayLog, isLoading, addLogEntry, updateLogEntry } = useDailyLogData(viewDate, activeTab);
 
-  const handleToday = () => {
-    setViewDate(getUKLocalDate());
-  };
-
-  const [activeCategory, setActiveCategory] = useState<AnimalCategory>(AnimalCategory.OWLS);
-  const [hideSubAccounts, setHideSubAccounts] = useState(true);
-  const isProcessing = useRef<Set<string>>(new Set());
-  
-  const { animals, getTodayLog, addLogEntry, updateLogEntry, isLoading } = useDailyLogData(viewDate, activeCategory);
-  const { isSyncing } = useWeatherSync();
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
-  const [selectedType, setSelectedType] = useState<LogType>(LogType.GENERAL);
-
-  const visibleAnimals = hideSubAccounts 
-    ? animals.filter(a => !(a.entityType === EntityType.INDIVIDUAL && a.parentMobId))
-    : animals;
-
-  const categories = [
-    AnimalCategory.OWLS,
-    AnimalCategory.RAPTORS,
-    AnimalCategory.MAMMALS,
-    AnimalCategory.EXOTICS
-  ];
-
-  const handleCellClick = (animal: Animal, type: LogType) => {
-    setSelectedAnimal(animal);
-    setSelectedType(type);
-    setIsModalOpen(true);
-  };
-
-  const renderHeaders = () => {
-    switch (activeCategory) {
-      case AnimalCategory.EXOTICS:
-        return (
-          <tr>
-            <th className="px-1 py-4 sm:p-4 text-left text-xs font-semibold text-slate-900 uppercase">Animal</th>
-            <th className="px-1 py-4 sm:p-4 text-center text-xs font-semibold text-slate-900 uppercase">FEED</th>
-            <th className="px-1 py-4 sm:p-4 text-center text-xs font-semibold text-slate-900 uppercase">MISTING</th>
-            <th className="px-1 py-4 sm:p-4 text-center text-xs font-semibold text-slate-900 uppercase">ENV</th>
-          </tr>
-        );
-      default:
-        return (
-          <tr>
-            <th className="px-1 py-4 sm:p-4 text-left text-xs font-semibold text-slate-900 uppercase">Animal</th>
-            <th className="px-1 py-4 sm:p-4 text-center text-xs font-semibold text-slate-900 uppercase">WT</th>
-            <th className="px-1 py-4 sm:p-4 text-center text-xs font-semibold text-slate-900 uppercase">FEED</th>
-            <th className="px-1 py-4 sm:p-4 text-center text-xs font-semibold text-slate-900 uppercase">ENV</th>
-          </tr>
-        );
+  // THE FIX: Updates the record if the ID is present!
+  const handleSaveLog = async (entry: any) => {
+    try {
+        if (entry.id) {
+            await updateLogEntry(entry.id, entry);
+        } else {
+            await addLogEntry(entry);
+        }
+        setIsAddModalOpen(false);
+        setSelectedAnimal(null);
+    } catch (error) {
+        console.error('Failed to save log', error);
     }
   };
 
-  const renderRow = (animal: Animal) => {
-    let parentMobName: string | undefined;
-    if (animal.entityType === EntityType.INDIVIDUAL && animal.parentMobId) {
-      const parent = animals.find(a => a.id === animal.parentMobId);
-      if (parent) {
-        parentMobName = parent.name;
-      }
-    }
+  const filteredAnimals = animals.filter((a: any) => 
+    !a.isDeleted && 
+    !a.archived && 
+    (searchTerm === '' || a.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
-    switch (animal.category) {
-      case AnimalCategory.OWLS:
-      case AnimalCategory.RAPTORS:
-        return <BirdRow key={animal.id} animal={animal} getTodayLog={getTodayLog} onCellClick={handleCellClick} parentMobName={parentMobName} />;
-      case AnimalCategory.MAMMALS:
-        return <MammalRow key={animal.id} animal={animal} getTodayLog={getTodayLog} onCellClick={handleCellClick} parentMobName={parentMobName} />;
-      case AnimalCategory.EXOTICS:
-        return <ExoticRow key={animal.id} animal={animal} getTodayLog={getTodayLog} onCellClick={handleCellClick} parentMobName={parentMobName} />;
-      default:
-        return null;
-    }
-  };
+  const tabs = [AnimalCategory.OWLS, AnimalCategory.RAPTORS, AnimalCategory.MAMMALS, AnimalCategory.EXOTICS];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 pt-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">DAILY LOG</h1>
-            <p className="text-sm text-slate-500 mt-1">Log and track daily animal activities.</p>
-            <div className="flex items-center gap-1 mt-2 bg-slate-50 border border-slate-200 rounded-lg p-1 w-fit shadow-sm">
-              <button 
-                onClick={handlePrevDay} 
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-md transition-colors"
-                title="Previous Day"
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              <div className="flex items-center gap-2 px-2 border-x border-slate-200">
-                <Calendar size={14} className="text-slate-400" />
-                <input 
-                  type="date" 
-                  value={viewDate}
-                  onChange={(e) => setViewDate(e.target.value)}
-                  className="text-xs font-bold text-slate-700 bg-transparent focus:outline-none w-28 text-center cursor-pointer"
-                />
-              </div>
-
-              <button 
-                onClick={handleNextDay} 
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-md transition-colors"
-                title="Next Day"
-              >
-                <ChevronRight size={16} />
-              </button>
-
-              <button 
-                onClick={handleToday}
-                className={`ml-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-colors ${viewDate === getUKLocalDate() ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:bg-slate-200'}`}
-              >
-                Today
-              </button>
-            </div>
+          <h1 className="text-2xl font-bold text-slate-900">Daily Logs</h1>
+          <p className="text-slate-500">Record daily weights, feed, and observations.</p>
         </div>
-        {isSyncing && <span className="text-sm text-slate-500 animate-pulse">Syncing Weather...</span>}
+        <div className="flex items-center gap-2">
+            <input 
+                type="date" 
+                value={viewDate} 
+                onChange={(e) => setViewDate(e.target.value)} 
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium"
+            />
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-        <div className="flex overflow-x-auto scrollbar-hide bg-slate-100 p-1 rounded-xl gap-0.5 sm:gap-1">
-          {categories.map(category => (
+      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="flex overflow-x-auto scrollbar-hide bg-slate-100 p-1 rounded-xl gap-1">
+          {tabs.map(tab => (
             <button
-              key={category}
-              onClick={() => setActiveCategory(category)}
-              className={`flex-1 min-w-fit sm:min-w-[100px] py-1.5 px-1 sm:py-2.5 text-[11px] sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                activeCategory === category 
-                  ? 'bg-white text-blue-700 shadow-sm font-bold' 
-                  : 'text-slate-500 hover:text-slate-700'
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {category}
+              {tab.charAt(0) + tab.slice(1).toLowerCase()}
             </button>
           ))}
         </div>
-        <button 
-          onClick={() => setHideSubAccounts(!hideSubAccounts)}
-          className={`ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${hideSubAccounts ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-        >
-          <Users size={14} />
-          {hideSubAccounts ? 'Sub-Accounts Hidden' : 'Showing All'}
-        </button>
+        <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+                type="text" 
+                placeholder="Search animals..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg w-full sm:w-64"
+            />
+        </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            {renderHeaders()}
-          </thead>
-          <tbody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-b border-slate-100 animate-pulse">
-                  <td className="px-1 py-4 sm:p-4 flex items-center gap-1 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-200 shrink-0"></div>
-                    <div>
-                      <div className="h-4 w-16 sm:w-24 bg-slate-200 rounded mb-2"></div>
-                      <div className="h-3 w-12 sm:w-16 bg-slate-200 rounded"></div>
-                    </div>
-                  </td>
-                  <td className="px-1 py-4 sm:p-4"><div className="h-8 w-full min-w-[40px] sm:w-16 bg-slate-200 rounded-lg"></div></td>
-                  <td className="px-1 py-4 sm:p-4"><div className="h-8 w-full min-w-[40px] sm:w-16 bg-slate-200 rounded-lg"></div></td>
-                  <td className="px-1 py-4 sm:p-4"><div className="h-8 w-full min-w-[40px] sm:w-16 bg-slate-200 rounded-lg"></div></td>
-                </tr>
-              ))
-            ) : (
-              visibleAnimals.map(renderRow)
-            )}
-          </tbody>
-        </table>
-      </div>
+      {isLoading ? (
+        <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th className="px-4 py-3 font-bold text-slate-600">Animal</th>
+                            <th className="px-4 py-3 font-bold text-slate-600">Weight</th>
+                            <th className="px-4 py-3 font-bold text-slate-600">Feed</th>
+                            <th className="px-4 py-3 font-bold text-slate-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {filteredAnimals.length === 0 ? (
+                            <tr><td colSpan={4} className="p-8 text-center text-slate-500">No animals found.</td></tr>
+                        ) : (
+                            filteredAnimals.map((animal: any) => {
+                                const weightLog = getTodayLog(animal.id, LogType.WEIGHT);
+                                const feedLog = getTodayLog(animal.id, LogType.FEED);
+                                
+                                if (animal.category === AnimalCategory.OWLS || animal.category === AnimalCategory.RAPTORS) {
+                                    return <BirdRow key={animal.id} animal={animal} weightLog={weightLog} feedLog={feedLog} onLogData={() => { setSelectedAnimal(animal); setIsAddModalOpen(true); }} />;
+                                }
+                                if (animal.category === AnimalCategory.MAMMALS) {
+                                    return <MammalRow key={animal.id} animal={animal} weightLog={weightLog} feedLog={feedLog} onLogData={() => { setSelectedAnimal(animal); setIsAddModalOpen(true); }} />;
+                                }
+                                return <ExoticRow key={animal.id} animal={animal} weightLog={weightLog} feedLog={feedLog} onLogData={() => { setSelectedAnimal(animal); setIsAddModalOpen(true); }} />;
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      )}
 
-      {isModalOpen && selectedAnimal && (
-        <AddEntryModal 
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSave={async (entry: Partial<LogEntry>) => {
-            if (entry.animalId && isProcessing.current.has(entry.animalId)) return;
-            if (entry.animalId) isProcessing.current.add(entry.animalId);
-            try {
-              const existingLog = getTodayLog(selectedAnimal.id, selectedType);
-              if (existingLog && existingLog.id) {
-                // EDIT MODE: Update the existing record using its ID
-                await updateLogEntry(existingLog.id, { ...existingLog, ...entry } as LogEntry);
-              } else {
-                // ADD MODE: Insert a new record
-                if (!entry.id) entry.id = uuidv4();
-                await addLogEntry(entry as LogEntry);
-              }
-              setIsModalOpen(false);
-            } finally {
-              if (entry.animalId) isProcessing.current.delete(entry.animalId);
-            }
-          }}
-          animal={selectedAnimal}
-          initialType={selectedType}
-          existingLog={getTodayLog(selectedAnimal.id, selectedType)}
-          initialDate={viewDate}
-        />
+      {isAddModalOpen && selectedAnimal && (
+          <AddEntryModal
+              isOpen={isAddModalOpen}
+              onClose={() => { setIsAddModalOpen(false); setSelectedAnimal(null); }}
+              onSave={handleSaveLog}
+              animal={selectedAnimal}
+              initialDate={viewDate}
+          />
       )}
     </div>
   );
-};
-
-export default DailyLog;
+}
