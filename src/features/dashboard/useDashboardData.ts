@@ -25,7 +25,6 @@ export interface PendingTask {
 
 export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDate: string) {
   
-  // 1. Native Reactive Observes (Satisfies _getQuery)
   const { data: rawAnimals = [], isLoading: animalsLoading } = useLiveQuery((q) => 
     q.from({ item: animalsCollection })
   );
@@ -40,20 +39,17 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
 
   const isLoading = animalsLoading || logsLoading || tasksLoading;
 
-  // Filter base datasets
   const liveAnimals = useMemo(() => rawAnimals.filter(a => !a.isDeleted && !a.archived), [rawAnimals]);
   const archivedAnimals = useMemo(() => rawAnimals.filter(a => !a.isDeleted && a.archived), [rawAnimals]);
   const logs = useMemo(() => rawLogs.filter(l => !l.isDeleted), [rawLogs]);
   const tasks = useMemo(() => rawTasks.filter(t => !t.isDeleted), [rawTasks]);
   
-  // FIXED: Sync with UI Date Selector
   const todayLogsFiltered = useMemo(() => logs.filter(l => l.logDate === viewDate), [logs, viewDate]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('alpha-asc');
   const [isOrderLocked, setIsOrderLocked] = useState(false);
 
-  // Compute Animal Stats
   const animalStats = useMemo(() => {
     let filtered = liveAnimals;
     if (activeTab && activeTab !== AnimalCategory.ALL && activeTab !== 'ARCHIVED') {
@@ -68,14 +64,12 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
     return { total: filtered.length, weighed, fed, animalData: new Map<string, AnimalStatsData>() };
   }, [liveAnimals, activeTab, todayLogsFiltered]);
 
-  // Compute Task Stats
   const taskStats = useMemo(() => {
     const pendingTasks = tasks.filter(t => !t.completed && t.type !== 'HEALTH').map(t => ({ id: t.id, title: t.title, dueDate: t.dueDate }));
     const pendingHealth = tasks.filter(t => !t.completed && t.type === 'HEALTH').map(t => ({ id: t.id, title: t.title, dueDate: t.dueDate }));
     return { pendingTasks, pendingHealth };
   }, [tasks]);
 
-  // Build the Final UI List
   const filteredAnimals = useMemo(() => {
     let result = activeTab === 'ARCHIVED' ? [...archivedAnimals] : [...liveAnimals];
     
@@ -94,8 +88,19 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
     
     if (sortOption === 'alpha-asc') result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     if (sortOption === 'alpha-desc') result.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    
+    // CRITICAL FIX: Safer Custom Sorting. Uninitialized items fallback to alphabetical.
+    if (sortOption === 'custom') {
+        result.sort((a, b) => {
+            const orderA = a.customOrder ?? 999999; 
+            const orderB = b.customOrder ?? 999999;
+            if (orderA === orderB) {
+                return (a.name || '').localeCompare(b.name || '');
+            }
+            return orderA - orderB;
+        });
+    }
 
-    // Map the rich data onto the animal rows
     return result.map(animal => {
       const animalTodayLogs = todayLogsFiltered.filter(l => l.animalId === animal.id);
       const todayWeight = animalTodayLogs.find(l => l.logType === LogType.WEIGHT);
@@ -118,5 +123,5 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
   const toggleOrderLock = (locked: boolean) => setIsOrderLocked(locked);
   const cycleSort = () => setSortOption(prev => prev === 'alpha-asc' ? 'alpha-desc' : prev === 'alpha-desc' ? 'custom' : 'alpha-asc');
 
-  return { filteredAnimals, animalStats, taskStats, isLoading, searchTerm, setSearchTerm, sortOption, cycleSort, isOrderLocked, toggleOrderLock };
+  return { filteredAnimals, animalStats, taskStats, isLoading, searchTerm, setSearchTerm, sortOption, setSortOption, cycleSort, isOrderLocked, toggleOrderLock };
 }

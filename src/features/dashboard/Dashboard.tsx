@@ -6,7 +6,6 @@ import AnimalFormModal from '../animals/AnimalFormModal';
 import { useDashboardData, EnhancedAnimal, PendingTask } from './useDashboardData';
 import { usePermissions } from '../../hooks/usePermissions';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { animalsCollection } from '../../lib/database';
 
 interface DashboardProps {
@@ -21,7 +20,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     onSelectAnimal, activeTab, setActiveTab, viewDate, setViewDate
 }) => {
   const permissions = usePermissions();
-  const queryClient = useQueryClient();
   const canManageSystem = permissions.isAdmin || permissions.isOwner;
 
   const dashboardData = useDashboardData(activeTab, viewDate);
@@ -30,8 +28,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     animalStats,
     taskStats,
     isLoading,
-    cycleSort,
     sortOption,
+    setSortOption, 
+    cycleSort,
     isOrderLocked,
     toggleOrderLock
   } = dashboardData;
@@ -46,66 +45,49 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // -------------------------------------------------------------
-  // THE NEW INSTANT MUTATION ENGINE
+  // GUARANTEED REORDER ENGINE (The Freeze Pattern)
   // -------------------------------------------------------------
-  const moveAnimalMutation = useMutation({
-    mutationFn: async ({ animalToMove, targetAnimal }: { animalToMove: EnhancedAnimal, targetAnimal: EnhancedAnimal }) => {
-      const orderA = animalToMove.customOrder ?? 0;
-      const orderB = targetAnimal.customOrder ?? 0;
-      if (orderA === orderB) {
-        await animalsCollection.update(animalToMove.id, (old: EnhancedAnimal) => ({ ...old, customOrder: orderB - 5 }));
-      } else {
-        await animalsCollection.update(animalToMove.id, (old: EnhancedAnimal) => ({ ...old, customOrder: orderB }));
-        await animalsCollection.update(targetAnimal.id, (old: EnhancedAnimal) => ({ ...old, customOrder: orderA }));
-      }
-    },
-    onMutate: async ({ animalToMove, targetAnimal, contextRows }: { animalToMove: EnhancedAnimal, targetAnimal: EnhancedAnimal, contextRows: EnhancedAnimal[] }) => {
-      await queryClient.cancelQueries();
-      const previousAnimals = queryClient.getQueryData<EnhancedAnimal[]>(['animals']);
-      
-      const indexA = contextRows.findIndex((a: EnhancedAnimal) => a.id === animalToMove.id);
-      const indexB = contextRows.findIndex((a: EnhancedAnimal) => a.id === targetAnimal.id);
-      const optimisticOrderA = targetAnimal.customOrder ?? (indexB * 10);
-      const optimisticOrderB = animalToMove.customOrder ?? (indexA * 10);
-
-      queryClient.setQueryData<EnhancedAnimal[]>(['animals'], (old: EnhancedAnimal[] | undefined) => {
-        if (!old) return old;
-        return old.map((animal: EnhancedAnimal) => {
-          if (animal.id === animalToMove.id) return { ...animal, customOrder: optimisticOrderA };
-          if (animal.id === targetAnimal.id) return { ...animal, customOrder: optimisticOrderB };
-          return animal;
-        });
-      });
-      return { previousAnimals };
-    },
-    onError: (err, variables, context: { previousAnimals?: EnhancedAnimal[] }) => {
-      if (context?.previousAnimals) queryClient.setQueryData(['animals'], context.previousAnimals);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries();
-    },
-  });
-
-  // -------------------------------------------------------------
-  // CONTEXT-AWARE ARROW CLICK
-  // -------------------------------------------------------------
-  const handleArrowClick = (animal: EnhancedAnimal, direction: 'up' | 'down', contextRows: EnhancedAnimal[], e: React.MouseEvent) => {
+  const handleArrowClick = async (animal: EnhancedAnimal, direction: 'up' | 'down', contextRows: EnhancedAnimal[], e: React.MouseEvent) => {
       e.stopPropagation();
       if (!canManageSystem) return;
 
-      const currentIndex = contextRows.findIndex((a: EnhancedAnimal) => a.id === animal.id);
+      const currentIndex = contextRows.findIndex((a) => a.id === animal.id);
       if (currentIndex === -1) return;
       if (direction === 'up' && currentIndex === 0) return;
       if (direction === 'down' && currentIndex === contextRows.length - 1) return;
 
       const targetAnimal = contextRows[direction === 'up' ? currentIndex - 1 : currentIndex + 1];
+      const updates: Promise<any>[] = [];
 
-      moveAnimalMutation.mutate({ animalToMove: animal, targetAnimal, contextRows });
+      // THE FIX: Check if we need to initialize the group to prevent "Mathematical Jumps"
+      const needsInitialization = contextRows.some(a => a.customOrder === undefined);
+      if (needsInitialization) {
+          contextRows.forEach((a, idx) => {
+              a.customOrder = idx * 10; // Set locally so math below functions
+              updates.push(animalsCollection.update(a.id, (old: any) => ({ ...old, customOrder: idx * 10 })));
+          });
+      }
+
+      const orderA = animal.customOrder ?? (currentIndex * 10);
+      const orderB = targetAnimal.customOrder ?? ((direction === 'up' ? currentIndex - 1 : currentIndex + 1) * 10);
+
+      if (orderA === orderB) {
+          updates.push(animalsCollection.update(animal.id, (old: any) => ({ ...old, customOrder: orderB - 5 })));
+      } else {
+          updates.push(animalsCollection.update(animal.id, (old: any) => ({ ...old, customOrder: orderB })));
+          updates.push(animalsCollection.update(targetAnimal.id, (old: any) => ({ ...old, customOrder: orderA })));
+      }
+
+      try {
+          await Promise.all(updates);
+      } catch (error) {
+          console.error("Failed to reorder animals:", error);
+      }
   };
 
   const handleSortSelect = (val: string) => {
-      if (dashboardData.setSortOption) {
-          dashboardData.setSortOption(val);
+      if (setSortOption) {
+          setSortOption(val);
       } else {
           cycleSort(); 
       }
@@ -163,7 +145,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-6 pt-4">
       
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
@@ -173,7 +154,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Tasks & Health Rota Bento */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col transition-all duration-300">
               <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsBentoMinimized(!isBentoMinimized)}>
@@ -260,7 +240,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
         <div className="bg-[#0fa968] rounded-xl p-4 text-white flex justify-between items-center shadow-sm">
           <div>
@@ -286,7 +265,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Viewing Options Control Bar */}
       <div className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex flex-wrap items-center justify-center gap-3 w-full">
           <div className="flex items-center gap-1.5 text-slate-700 font-medium whitespace-nowrap text-[10px] lg:text-xs">
@@ -306,7 +284,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         
         <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
             
-            {/* Custom React Dropdown ensuring visibility */}
             <div className="relative z-30">
               <button 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
@@ -344,7 +321,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex overflow-x-auto scrollbar-hide bg-slate-100 p-1 rounded-xl gap-0.5 sm:gap-1">
         {[AnimalCategory.OWLS, AnimalCategory.RAPTORS, AnimalCategory.MAMMALS, AnimalCategory.EXOTICS].map(cat => (
           <button
@@ -369,12 +345,10 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* List Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg lg:text-2xl font-semibold text-slate-800">Your {activeTab ? (activeTab.charAt(0) + activeTab.slice(1).toLowerCase()) : 'Animals'}</h2>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="w-full overflow-x-auto overflow-y-hidden">
           <table className="w-full text-left text-sm">
@@ -421,7 +395,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 const rows: React.ReactNode[] = [];
 
-                // Render Groups
                 Array.from(grouped.entries()).forEach(([parentMobId, animals]: [string, EnhancedAnimal[]]) => {
                   const isExpanded = expandedGroups[parentMobId];
                   const parentMob = standalone.find((a: EnhancedAnimal) => a.id === parentMobId);
@@ -440,7 +413,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                   );
 
                   if (isExpanded) {
-                    // CONTEXT FIX: Pass the grouped 'animals' array explicitly to the handler
                     animals.forEach((animal: EnhancedAnimal) => {
                       rows.push(
                         <tr key={animal.id} className="hover:bg-slate-50 transition-colors cursor-pointer bg-slate-50/30" onClick={() => onSelectAnimal(animal)}>
@@ -485,7 +457,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                   }
                 });
 
-                // CONTEXT FIX: Isolate standalone rows into their own array for contextual math
                 const standaloneRows = standalone.filter((a: EnhancedAnimal) => !grouped.has(a.id));
                 standaloneRows.forEach((animal: EnhancedAnimal) => {
                   rows.push(
