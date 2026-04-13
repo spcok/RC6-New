@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { Animal, LogType } from '../../types';
+import { Animal, LogType, LogEntry } from '../../types';
 import WeightForm from './forms/WeightForm';
 import FeedForm from './forms/FeedForm';
 import TemperatureForm from './forms/TemperatureForm';
 import StandardForm from './forms/StandardForm';
 import BirthForm from './forms/BirthForm';
-import { useDailyLogData } from './useDailyLogData';
 
 interface AddEntryModalProps {
   isOpen: boolean;
@@ -15,45 +14,46 @@ interface AddEntryModalProps {
   animal?: Animal;
   initialDate?: string;
   defaultLogType?: LogType;
+  dailyLogs: LogEntry[]; // Receives the logs directly
 }
 
-export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialDate, defaultLogType = LogType.WEIGHT }: AddEntryModalProps) {
+export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialDate, defaultLogType = LogType.WEIGHT, dailyLogs }: AddEntryModalProps) {
   const [logType, setLogType] = useState<LogType>(defaultLogType);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const { getTodayLog } = useDailyLogData(initialDate || new Date().toISOString().split('T')[0], animal?.category || 'all');
 
   if (!isOpen || !animal) return null;
 
   const handleSubmit = async (data: any) => {
     setIsSubmitting(true);
     try {
-        const payload = Array.isArray(data) 
-            ? data.map(d => ({ ...d, animalId: animal.id, logDate: initialDate || new Date().toISOString().split('T')[0], logType }))
-            : { ...data, animalId: animal.id, logDate: initialDate || new Date().toISOString().split('T')[0], logType };
-
-        await onSave(payload);
+       await onSave({
+          ...data,
+          animalId: animal.id,
+          logDate: initialDate || new Date().toISOString().split('T')[0],
+          logType,
+        });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const renderForm = () => {
-    const existingWeight = getTodayLog(animal.id, LogType.WEIGHT);
-    const existingFeed = getTodayLog(animal.id, LogType.FEED);
-    const existingTemp = getTodayLog(animal.id, LogType.TEMPERATURE);
+    // Finds the exact log safely from the array passed in
+    const existingLog = dailyLogs.find(l => l.animalId === animal.id && l.logType === logType);
 
+    // key={existingLog?.id} forces TanStack form to reload with the prefilled data
     switch (logType) {
       case LogType.WEIGHT:
-        return <WeightForm key={existingWeight?.id || 'w'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} existingData={existingWeight} />;
+        return <WeightForm key={existingLog?.id || 'w_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} existingData={existingLog} />;
       case LogType.FEED:
-        return <FeedForm key={existingFeed?.id || 'f'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} existingData={existingFeed} />;
+        return <FeedForm key={existingLog?.id || 'f_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} existingData={existingLog} />;
       case LogType.TEMPERATURE:
-        return <TemperatureForm key={existingTemp?.id || 't'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} existingData={existingTemp} />;
+      case LogType.MISTING: // Ensure Exotic Misting correctly mounts the Temp form layout
+        return <TemperatureForm key={existingLog?.id || 't_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} existingData={existingLog} logType={logType} />;
       case LogType.BIRTH:
         return <BirthForm onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} />;
       default:
-        return <StandardForm onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} logType={logType} animal={animal} />;
+        return <StandardForm key={existingLog?.id || 's_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} logType={logType} animal={animal} existingData={existingLog} />;
     }
   };
 

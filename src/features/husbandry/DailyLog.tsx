@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useDailyLogData } from './useDailyLogData';
 import { AnimalCategory, LogType } from '../../types';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import AddEntryModal from './AddEntryModal';
 import { getUKLocalDate } from '../../services/temporalService';
 
@@ -16,31 +16,46 @@ export default function DailyLog() {
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedAnimal, setSelectedAnimal] = useState<any>(null);
+  // NEW: Captures which specific type of log was clicked so the modal opens straight to it
+  const [initialLogType, setInitialLogType] = useState<LogType>(LogType.WEIGHT);
 
-  const { animals, getTodayLog, isLoading, addLogEntry, updateLogEntry } = useDailyLogData(viewDate, activeTab);
+  const { animals, dailyLogs, isLoading, addLogEntry, updateLogEntry } = useDailyLogData(viewDate, activeTab);
 
-  const handleSaveLog = async (entryPayload: any) => {
+  // SAFE DATA RETRIEVAL (Bypasses Vite crash)
+  const getTodayLog = useCallback((animalId: string, logType: LogType) => {
+    return dailyLogs.find(log => log.animalId === animalId && log.logType === logType);
+  }, [dailyLogs]);
+
+  const handleSaveLog = async (entry: any) => {
     try {
-        const processSave = async (entry: any) => {
-            if (entry.id) {
-                await updateLogEntry(entry.id, entry);
-            } else {
-                await addLogEntry(entry);
-            }
-        };
-
-        // Allows us to loop over Mammal Multiple Feeds seamlessly
-        if (Array.isArray(entryPayload)) {
-            for (const item of entryPayload) await processSave(item);
+        if (entry.id) {
+            await updateLogEntry(entry.id, entry);
         } else {
-            await processSave(entryPayload);
+            await addLogEntry(entry);
         }
-
         setIsAddModalOpen(false);
         setSelectedAnimal(null);
     } catch (error) {
         console.error('Failed to save log', error);
     }
+  };
+
+  const handleCellClick = (animal: any, type: LogType) => {
+      setSelectedAnimal(animal);
+      setInitialLogType(type);
+      setIsAddModalOpen(true);
+  };
+
+  const handlePrevDay = () => {
+    const d = new Date(viewDate);
+    d.setDate(d.getDate() - 1);
+    setViewDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(viewDate);
+    d.setDate(d.getDate() + 1);
+    setViewDate(d.toISOString().split('T')[0]);
   };
 
   const filteredAnimals = animals.filter((a: any) => 
@@ -59,12 +74,18 @@ export default function DailyLog() {
           <p className="text-slate-500">Record daily weights, feed, and observations.</p>
         </div>
         <div className="flex items-center gap-2">
-            <input 
-                type="date" 
-                value={viewDate} 
-                onChange={(e) => setViewDate(e.target.value)} 
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium"
-            />
+          <button onClick={handlePrevDay} className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors">
+            <ChevronLeft size={20} />
+          </button>
+          <input 
+              type="date" 
+              value={viewDate} 
+              onChange={(e) => setViewDate(e.target.value)} 
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium"
+          />
+          <button onClick={handleNextDay} className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors">
+            <ChevronRight size={20} />
+          </button>
         </div>
       </div>
 
@@ -103,9 +124,9 @@ export default function DailyLog() {
                     <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
                             <th className="px-4 py-3 font-bold text-slate-600">Animal</th>
-                            <th className="px-4 py-3 font-bold text-slate-600">Weight</th>
-                            <th className="px-4 py-3 font-bold text-slate-600">Feed</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-right pr-6">Actions</th>
+                            <th className="px-4 py-3 font-bold text-slate-600 text-center">Weight</th>
+                            <th className="px-4 py-3 font-bold text-slate-600 text-center">Feed</th>
+                            <th className="px-4 py-3 font-bold text-slate-600 text-center">Temp/Env</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -113,16 +134,13 @@ export default function DailyLog() {
                             <tr><td colSpan={4} className="p-8 text-center text-slate-500">No animals found.</td></tr>
                         ) : (
                             filteredAnimals.map((animal: any) => {
-                                const weightLog = getTodayLog(animal.id, LogType.WEIGHT);
-                                const feedLog = getTodayLog(animal.id, LogType.FEED);
-                                
                                 if (animal.category === AnimalCategory.OWLS || animal.category === AnimalCategory.RAPTORS) {
-                                    return <BirdRow key={animal.id} animal={animal} weightLog={weightLog} feedLog={feedLog} onLogData={() => { setSelectedAnimal(animal); setIsAddModalOpen(true); }} />;
+                                    return <BirdRow key={animal.id} animal={animal} getTodayLog={getTodayLog} onCellClick={handleCellClick} />;
                                 }
                                 if (animal.category === AnimalCategory.MAMMALS) {
-                                    return <MammalRow key={animal.id} animal={animal} weightLog={weightLog} feedLog={feedLog} onLogData={() => { setSelectedAnimal(animal); setIsAddModalOpen(true); }} />;
+                                    return <MammalRow key={animal.id} animal={animal} getTodayLog={getTodayLog} onCellClick={handleCellClick} />;
                                 }
-                                return <ExoticRow key={animal.id} animal={animal} weightLog={weightLog} feedLog={feedLog} onLogData={() => { setSelectedAnimal(animal); setIsAddModalOpen(true); }} />;
+                                return <ExoticRow key={animal.id} animal={animal} getTodayLog={getTodayLog} onCellClick={handleCellClick} />;
                             })
                         )}
                     </tbody>
@@ -138,6 +156,8 @@ export default function DailyLog() {
               onSave={handleSaveLog}
               animal={selectedAnimal}
               initialDate={viewDate}
+              defaultLogType={initialLogType}
+              dailyLogs={dailyLogs} // Passing the raw array directly to the modal
           />
       )}
     </div>

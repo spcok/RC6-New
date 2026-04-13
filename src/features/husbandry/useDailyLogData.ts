@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
 import { getUKLocalDate } from '../../services/temporalService';
 import { dailyLogsCollection, animalsCollection } from '../../lib/database';
-import { LogEntry, LogType, AnimalCategory } from '../../types';
+import { LogEntry, AnimalCategory } from '../../types';
 
-export const useDailyLogData = (viewDate: string, activeCategory: string, animalId?: string) => {
+export const useDailyLogData = (viewDate: string, activeCategory: string) => {
   const { data: logs = [], isLoading: logsLoading } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }));
   const { data: animals = [], isLoading: animalsLoading } = useLiveQuery((q) => q.from({ item: animalsCollection }));
   
@@ -16,17 +16,8 @@ export const useDailyLogData = (viewDate: string, activeCategory: string, animal
        result = result.filter((log: LogEntry) => log.logDate === targetDate);
     }
     
-    if (animalId) {
-       result = result.filter((log: LogEntry) => log.animalId === animalId);
-    }
-    
     return result.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [logs, viewDate, animalId]);
-
-  const getTodayLog = (id: string, type: LogType) => {
-    const targetDate = viewDate === 'today' || viewDate === 'all' ? getUKLocalDate() : viewDate;
-    return logs.find((log: LogEntry) => log.animalId === id && log.logType === type && log.logDate === targetDate && !log.isDeleted);
-  };
+  }, [logs, viewDate]);
 
   const filteredAnimals = useMemo(() => {
     return animals.filter((a: any) => {
@@ -39,7 +30,6 @@ export const useDailyLogData = (viewDate: string, activeCategory: string, animal
   return {
     animals: filteredAnimals,
     dailyLogs,
-    getTodayLog, 
     addLogEntry: async (entry: Partial<LogEntry>) => {
         await dailyLogsCollection.insert({
             id: entry.id || crypto.randomUUID(),
@@ -48,6 +38,7 @@ export const useDailyLogData = (viewDate: string, activeCategory: string, animal
             ...entry
         });
     }, 
+    // Safely added update function
     updateLogEntry: async (id: string, entry: Partial<LogEntry>) => {
       await dailyLogsCollection.update(id, (old: LogEntry) => ({ 
           ...old, 
