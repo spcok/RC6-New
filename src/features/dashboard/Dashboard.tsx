@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { AnimalCategory } from '../../types';
-import { Heart, AlertCircle, Plus, Calendar, Scale, Drumstick, ArrowUpDown, Loader2, ClipboardCheck, CheckCircle, ChevronUp, ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Heart, AlertCircle, Plus, Calendar, Scale, Drumstick, ArrowUpDown, Loader2, ClipboardCheck, CheckCircle, ChevronUp, ChevronDown, ChevronRight, Lock, Unlock, GripVertical } from 'lucide-react';
 import { formatWeightDisplay, parseLegacyWeightToGrams } from '../../services/weightUtils';
 import AnimalFormModal from '../animals/AnimalFormModal';
 import { useDashboardData, EnhancedAnimal, PendingTask } from './useDashboardData';
 import { usePermissions } from '../../hooks/usePermissions';
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { animalsCollection } from '../../lib/database';
 
 interface DashboardProps {
   onSelectAnimal: (animal: EnhancedAnimal) => void;
@@ -18,6 +21,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     onSelectAnimal, activeTab, setActiveTab, viewDate, setViewDate
 }) => {
   const permissions = usePermissions();
+  const queryClient = useQueryClient();
+  const canManageSystem = permissions.isAdmin || permissions.isOwner;
+
+  const dashboardData = useDashboardData(activeTab, viewDate);
   const {
     filteredAnimals,
     animalStats,
@@ -27,15 +34,88 @@ const Dashboard: React.FC<DashboardProps> = ({
     sortOption,
     isOrderLocked,
     toggleOrderLock
-  } = useDashboardData(activeTab, viewDate);
+  } = dashboardData;
 
   const [isCreateAnimalModalOpen, setIsCreateAnimalModalOpen] = useState(false);
   const [isBentoMinimized, setIsBentoMinimized] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const toggleGroup = (groupName: string) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
+
+  // -------------------------------------------------------------
+  // THE NEW INSTANT MUTATION ENGINE
+  // -------------------------------------------------------------
+  const moveAnimalMutation = useMutation({
+    mutationFn: async ({ animalToMove, targetAnimal }: { animalToMove: EnhancedAnimal, targetAnimal: EnhancedAnimal }) => {
+      const orderA = animalToMove.customOrder ?? 0;
+      const orderB = targetAnimal.customOrder ?? 0;
+      if (orderA === orderB) {
+        await animalsCollection.update(animalToMove.id, (old: EnhancedAnimal) => ({ ...old, customOrder: orderB - 5 }));
+      } else {
+        await animalsCollection.update(animalToMove.id, (old: EnhancedAnimal) => ({ ...old, customOrder: orderB }));
+        await animalsCollection.update(targetAnimal.id, (old: EnhancedAnimal) => ({ ...old, customOrder: orderA }));
+      }
+    },
+    onMutate: async ({ animalToMove, targetAnimal, contextRows }: { animalToMove: EnhancedAnimal, targetAnimal: EnhancedAnimal, contextRows: EnhancedAnimal[] }) => {
+      await queryClient.cancelQueries();
+      const previousAnimals = queryClient.getQueryData<EnhancedAnimal[]>(['animals']);
+      
+      const indexA = contextRows.findIndex((a: EnhancedAnimal) => a.id === animalToMove.id);
+      const indexB = contextRows.findIndex((a: EnhancedAnimal) => a.id === targetAnimal.id);
+      const optimisticOrderA = targetAnimal.customOrder ?? (indexB * 10);
+      const optimisticOrderB = animalToMove.customOrder ?? (indexA * 10);
+
+      queryClient.setQueryData<EnhancedAnimal[]>(['animals'], (old: EnhancedAnimal[] | undefined) => {
+        if (!old) return old;
+        return old.map((animal: EnhancedAnimal) => {
+          if (animal.id === animalToMove.id) return { ...animal, customOrder: optimisticOrderA };
+          if (animal.id === targetAnimal.id) return { ...animal, customOrder: optimisticOrderB };
+          return animal;
+        });
+      });
+      return { previousAnimals };
+    },
+    onError: (err, variables, context: { previousAnimals?: EnhancedAnimal[] }) => {
+      if (context?.previousAnimals) queryClient.setQueryData(['animals'], context.previousAnimals);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+
+  // -------------------------------------------------------------
+  // CONTEXT-AWARE ARROW CLICK
+  // -------------------------------------------------------------
+  const handleArrowClick = (animal: EnhancedAnimal, direction: 'up' | 'down', contextRows: EnhancedAnimal[], e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!canManageSystem) return;
+
+      const currentIndex = contextRows.findIndex((a: EnhancedAnimal) => a.id === animal.id);
+      if (currentIndex === -1) return;
+      if (direction === 'up' && currentIndex === 0) return;
+      if (direction === 'down' && currentIndex === contextRows.length - 1) return;
+
+      const targetAnimal = contextRows[direction === 'up' ? currentIndex - 1 : currentIndex + 1];
+
+      moveAnimalMutation.mutate({ animalToMove: animal, targetAnimal, contextRows });
+  };
+
+  const handleSortSelect = (val: string) => {
+      if (dashboardData.setSortOption) {
+          dashboardData.setSortOption(val);
+      } else {
+          cycleSort(); 
+      }
+      
+      if (val !== 'custom') {
+          toggleOrderLock(true);
+      }
+      setIsDropdownOpen(false);
+  };
+
 
   if (!permissions.view_animals) {
     return (
@@ -51,14 +131,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const getWeightDisplay = (log?: { weight?: number; weightUnit?: string; weightGrams?: number; value?: string | number }, unit: 'g' | 'oz' | 'lbs_oz' | 'kg' = 'g') => {
       if (!log) return '-';
-      
       const targetUnit = unit || 'g';
       const grams = log.weightGrams ?? parseLegacyWeightToGrams(String(log.value || ''));
-      
-      if (grams !== null && !isNaN(grams)) {
-        return formatWeightDisplay(grams, targetUnit as 'g' | 'kg' | 'oz' | 'lbs_oz');
-      }
-
+      if (grams !== null && !isNaN(grams)) return formatWeightDisplay(grams, targetUnit as 'g' | 'kg' | 'oz' | 'lbs_oz');
       if (log.weight) return `${log.weight}${log.weightUnit || 'g'}`;
       return typeof log.value === 'string' ? log.value : String(log.value || '-');
   };
@@ -82,6 +157,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
       );
   }
+
+  const isReorderingEnabled = !isOrderLocked && activeTab !== 'ARCHIVED' && canManageSystem && sortOption === 'custom';
 
   return (
     <div className="space-y-6 pt-4">
@@ -211,7 +288,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Viewing Options Control Bar */}
       <div className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        {/* Row 1: Date Controls */}
         <div className="flex flex-wrap items-center justify-center gap-3 w-full">
           <div className="flex items-center gap-1.5 text-slate-700 font-medium whitespace-nowrap text-[10px] lg:text-xs">
             <Calendar size={16} className="text-blue-600" />
@@ -228,14 +304,38 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
         
-        {/* Row 2: Sort, Lock, Add */}
         <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
-            <button onClick={cycleSort} className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] lg:text-xs font-medium hover:bg-slate-50 text-slate-700 bg-white min-w-[80px]">
-              <ArrowUpDown size={14} /> {sortOption === 'alpha-asc' ? 'A-Z' : sortOption === 'alpha-desc' ? 'Z-A' : 'Custom'}
-            </button>
-            <button onClick={() => toggleOrderLock(!isOrderLocked)} className={`shrink-0 p-2 border border-slate-200 rounded-lg ${isOrderLocked ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'}`}>
-              {isOrderLocked ? <Lock size={14} /> : <Unlock size={14} />}
-            </button>
+            
+            {/* Custom React Dropdown ensuring visibility */}
+            <div className="relative z-30">
+              <button 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-[10px] lg:text-xs font-medium hover:bg-slate-50 text-slate-700 bg-white min-w-[80px]"
+              >
+                <ArrowUpDown size={14} /> 
+                {sortOption === 'alpha-asc' ? 'Name (A-Z)' : sortOption === 'alpha-desc' ? 'Name (Z-A)' : 'Curated Order'}
+              </button>
+              
+              {isDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                  <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col py-1">
+                    <button onClick={() => handleSortSelect('alpha-asc')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'alpha-asc' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Name (A-Z)</button>
+                    <button onClick={() => handleSortSelect('alpha-desc')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'alpha-desc' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Name (Z-A)</button>
+                    {activeTab !== 'ARCHIVED' && (
+                        <button onClick={() => handleSortSelect('custom')} className={`text-left px-3 py-2 text-[10px] lg:text-xs font-medium hover:bg-slate-50 ${sortOption === 'custom' ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}>Curated Order</button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {sortOption === 'custom' && activeTab !== 'ARCHIVED' && canManageSystem && (
+              <button onClick={() => toggleOrderLock(!isOrderLocked)} className={`shrink-0 p-2 border border-slate-200 rounded-lg transition-colors ${isOrderLocked ? 'bg-slate-100 text-slate-400 hover:bg-slate-200' : 'bg-amber-100 text-amber-700 border-amber-300 shadow-sm'}`}>
+                {isOrderLocked ? <Lock size={14} /> : <Unlock size={14} />}
+              </button>
+            )}
+
           {permissions.add_animals && (
             <button onClick={() => setIsCreateAnimalModalOpen(true)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] lg:text-xs font-medium hover:bg-blue-700 shadow-sm whitespace-nowrap w-full sm:w-auto">
               <Plus size={14} /> Add {activeTab ? (activeTab.charAt(0) + activeTab.slice(1).toLowerCase()) : 'Animal'}
@@ -243,7 +343,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           )}
         </div>
       </div>
-
 
       {/* Tabs */}
       <div className="flex overflow-x-auto scrollbar-hide bg-slate-100 p-1 rounded-xl gap-0.5 sm:gap-1">
@@ -281,6 +380,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           <table className="w-full text-left text-sm">
             <thead className="bg-white border-b border-slate-200 text-slate-600 font-medium">
               <tr>
+                {isReorderingEnabled && (
+                  <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap w-16">Move</th>
+                )}
                 <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight">Name</th>
                 <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden xl:table-cell">Species</th>
                 <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs whitespace-nowrap hidden 2xl:table-cell">Ring/Microchip</th>
@@ -319,7 +421,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 const rows: React.ReactNode[] = [];
 
-                // Render groups
+                // Render Groups
                 Array.from(grouped.entries()).forEach(([parentMobId, animals]: [string, EnhancedAnimal[]]) => {
                   const isExpanded = expandedGroups[parentMobId];
                   const parentMob = standalone.find((a: EnhancedAnimal) => a.id === parentMobId);
@@ -327,7 +429,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   
                   rows.push(
                     <tr key={`group-${parentMobId}`} className="bg-slate-100/50 border-y border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => toggleGroup(parentMobId)}>
-                      <td colSpan={8} className="px-2 py-3 lg:px-4 lg:py-4">
+                      <td colSpan={isReorderingEnabled ? 10 : 9} className="px-2 py-3 lg:px-4 lg:py-4">
                         <div className="flex items-center gap-2">
                           {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
                           <span className="font-bold text-slate-800">{displayName}</span>
@@ -338,12 +440,23 @@ const Dashboard: React.FC<DashboardProps> = ({
                   );
 
                   if (isExpanded) {
+                    // CONTEXT FIX: Pass the grouped 'animals' array explicitly to the handler
                     animals.forEach((animal: EnhancedAnimal) => {
                       rows.push(
                         <tr key={animal.id} className="hover:bg-slate-50 transition-colors cursor-pointer bg-slate-50/30" onClick={() => onSelectAnimal(animal)}>
+                          {isReorderingEnabled && (
+                              <td className="px-1 py-1 w-16">
+                                <div className="flex items-center justify-between w-full pr-1 prevent-row-click select-none">
+                                  <div className="text-slate-300 hidden sm:block"><GripVertical size={14} /></div>
+                                  <div className="flex flex-col items-center justify-center">
+                                    <button onClick={(e) => handleArrowClick(animal, 'up', animals, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronUp size={16} strokeWidth={3} /></button>
+                                    <button onClick={(e) => handleArrowClick(animal, 'down', animals, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronDown size={16} strokeWidth={3} /></button>
+                                  </div>
+                                </div>
+                              </td>
+                          )}
                           <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-sm md:text-base font-bold text-slate-900 whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight pl-4 md:pl-8">
-                            <span className="text-slate-300 mr-2">↳</span>
-                            {animal.name ?? 'Unknown'}
+                            <span className="text-slate-300 mr-2">↳</span>{animal.name ?? 'Unknown'}
                           </td>
                           <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-nowrap hidden xl:table-cell">{animal.species ?? 'Unknown'}</td>
                           <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap hidden 2xl:table-cell">{animal.displayId ?? 'N/A'}</td>
@@ -355,26 +468,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                               </>
                           ) : (
                               <>
-                                  <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>
-                                  {animal.todayWeight ? getWeightDisplay(animal.todayWeight, animal.weightUnit ?? 'g') : '-'}
-                                  </td>
-                                  <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap">
-                                  {animal.todayFeed ? (typeof animal.todayFeed.value === 'string' ? animal.todayFeed.value : String(animal.todayFeed.value ?? 'Fed')) : '-'}
-                                  </td>
+                                  <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>{animal.todayWeight ? getWeightDisplay(animal.todayWeight, animal.weightUnit ?? 'g') : '-'}</td>
+                                  <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap">{animal.todayFeed ? (typeof animal.todayFeed.value === 'string' ? animal.todayFeed.value : String(animal.todayFeed.value ?? 'Fed')) : '-'}</td>
                                   <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-normal leading-tight min-w-[60px] ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : (activeTab === AnimalCategory.OWLS || activeTab === AnimalCategory.RAPTORS ? '' : 'hidden md:table-cell')}`}>{animal.lastFedStr ?? 'N/A'}</td>
                                   <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-normal min-w-[90px] ${activeTab === AnimalCategory.EXOTICS ? '' : 'hidden'}`}>
                                   {animal.nextFeedTask ? (
-                                      <div className="flex flex-col gap-0.5">
-                                      <span className="font-bold text-slate-800 text-xs uppercase tracking-tight">
-                                          {new Date(animal.nextFeedTask.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                                      </span>
-                                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">
-                                          {animal.nextFeedTask.notes ?? 'Scheduled'}
-                                      </span>
-                                      </div>
-                                  ) : (
-                                      <span className="text-slate-300">-</span>
-                                  )}
+                                      <div className="flex flex-col gap-0.5"><span className="font-bold text-slate-800 text-xs uppercase tracking-tight">{new Date(animal.nextFeedTask.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><span className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">{animal.nextFeedTask.notes ?? 'Scheduled'}</span></div>
+                                  ) : <span className="text-slate-300">-</span>}
                                   </td>
                                   <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-blue-500 whitespace-nowrap hidden md:table-cell">{animal.location ?? 'Unknown'}</td>
                               </>
@@ -385,10 +485,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                   }
                 });
 
-                // Render standalone animals (excluding those that are parent mobs)
-                standalone.filter((a: EnhancedAnimal) => !grouped.has(a.id)).forEach((animal: EnhancedAnimal) => {
+                // CONTEXT FIX: Isolate standalone rows into their own array for contextual math
+                const standaloneRows = standalone.filter((a: EnhancedAnimal) => !grouped.has(a.id));
+                standaloneRows.forEach((animal: EnhancedAnimal) => {
                   rows.push(
                     <tr key={animal.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onSelectAnimal(animal)}>
+                      {isReorderingEnabled && (
+                          <td className="px-1 py-1 w-16">
+                            <div className="flex items-center justify-between w-full pr-1 prevent-row-click select-none">
+                              <div className="text-slate-300 hidden sm:block"><GripVertical size={14} /></div>
+                              <div className="flex flex-col items-center justify-center">
+                                <button onClick={(e) => handleArrowClick(animal, 'up', standaloneRows, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronUp size={16} strokeWidth={3} /></button>
+                                <button onClick={(e) => handleArrowClick(animal, 'down', standaloneRows, e)} className="p-0.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded active:scale-95"><ChevronDown size={16} strokeWidth={3} /></button>
+                              </div>
+                            </div>
+                          </td>
+                      )}
                       <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-sm md:text-base font-bold text-slate-900 whitespace-normal break-words min-w-[90px] max-w-[140px] md:max-w-[250px] leading-tight">
                         {animal.name ?? 'Unknown'}
                       </td>
@@ -402,26 +514,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </>
                       ) : (
                           <>
-                              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>
-                              {animal.todayWeight ? getWeightDisplay(animal.todayWeight, animal.weightUnit ?? 'g') : '-'}
-                              </td>
-                              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap">
-                              {animal.todayFeed ? (typeof animal.todayFeed.value === 'string' ? animal.todayFeed.value : String(animal.todayFeed.value ?? 'Fed')) : '-'}
-                              </td>
+                              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : ''}`}>{animal.todayWeight ? getWeightDisplay(animal.todayWeight, animal.weightUnit ?? 'g') : '-'}</td>
+                              <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-nowrap">{animal.todayFeed ? (typeof animal.todayFeed.value === 'string' ? animal.todayFeed.value : String(animal.todayFeed.value ?? 'Fed')) : '-'}</td>
                               <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-400 whitespace-normal leading-tight min-w-[60px] ${activeTab === AnimalCategory.EXOTICS ? 'hidden' : (activeTab === AnimalCategory.OWLS || activeTab === AnimalCategory.RAPTORS ? '' : 'hidden md:table-cell')}`}>{animal.lastFedStr ?? 'N/A'}</td>
                               <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-slate-500 whitespace-normal min-w-[90px] ${activeTab === AnimalCategory.EXOTICS ? '' : 'hidden'}`}>
                               {animal.nextFeedTask ? (
-                                  <div className="flex flex-col gap-0.5">
-                                  <span className="font-bold text-slate-800 text-xs uppercase tracking-tight">
-                                      {new Date(animal.nextFeedTask.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                                  </span>
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">
-                                      {animal.nextFeedTask.notes ?? 'Scheduled'}
-                                  </span>
-                                  </div>
-                              ) : (
-                                  <span className="text-slate-300">-</span>
-                              )}
+                                  <div className="flex flex-col gap-0.5"><span className="font-bold text-slate-800 text-xs uppercase tracking-tight">{new Date(animal.nextFeedTask.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><span className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">{animal.nextFeedTask.notes ?? 'Scheduled'}</span></div>
+                              ) : <span className="text-slate-300">-</span>}
                               </td>
                               <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs md:text-sm text-blue-500 whitespace-nowrap hidden md:table-cell">{animal.location ?? 'Unknown'}</td>
                           </>
