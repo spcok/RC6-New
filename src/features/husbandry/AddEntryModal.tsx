@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { Animal, LogType, LogEntry } from '../../types';
+import { useAuthStore } from '../../store/authStore';
+import { Animal, LogType, LogEntry, AnimalCategory } from '../../types';
+import { useOperationalLists } from '../../hooks/useOperationalLists';
+
+// Import your beautiful RC5 Modular Forms
 import WeightForm from './forms/WeightForm';
 import FeedForm from './forms/FeedForm';
 import TemperatureForm from './forms/TemperatureForm';
@@ -14,46 +18,44 @@ interface AddEntryModalProps {
   animal?: Animal;
   initialDate?: string;
   defaultLogType?: LogType;
-  dailyLogs: LogEntry[]; // Receives the logs directly
+  dailyLogs?: LogEntry[]; // Array passed safely from DailyLog to bypass Vite crashes
 }
 
-export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialDate, defaultLogType = LogType.WEIGHT, dailyLogs }: AddEntryModalProps) {
+export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialDate, defaultLogType = LogType.WEIGHT, dailyLogs = [] }: AddEntryModalProps) {
   const [logType, setLogType] = useState<LogType>(defaultLogType);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Extracting data exactly as your RC5 forms expect
+  const user = useAuthStore(state => state.user);
+  const userInitials = user?.initials || 'UNK';
+  const { lists } = useOperationalLists();
+  const foodTypes = lists.filter(l => l.listType === 'FOOD_TYPE') || [];
+  const eventTypes = lists.filter(l => l.listType === 'EVENT_TYPE').map(l => l.value) || [];
 
   if (!isOpen || !animal) return null;
 
-  const handleSubmit = async (data: any) => {
-    setIsSubmitting(true);
-    try {
-       await onSave({
-          ...data,
-          animalId: animal.id,
-          logDate: initialDate || new Date().toISOString().split('T')[0],
-          logType,
-        });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const date = initialDate || new Date().toISOString().split('T')[0];
+
+  const handleSubmit = async (payload: any) => {
+    // The RC5 forms already perfectly construct the UUID and the DB payload.
+    await onSave(payload);
   };
 
   const renderForm = () => {
-    // Finds the exact log safely from the array passed in
+    // Inline array scan: Finds the exact log for editing without triggering a Vite hot-reload crash
     const existingLog = dailyLogs.find(l => l.animalId === animal.id && l.logType === logType);
 
-    // key={existingLog?.id} forces TanStack form to reload with the prefilled data
+    // The key={existingLog?.id} forces TanStack forms to repopulate defaultValues cleanly
     switch (logType) {
       case LogType.WEIGHT:
-        return <WeightForm key={existingLog?.id || 'w_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} existingData={existingLog} />;
+        return <WeightForm key={existingLog?.id || 'w_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} onSave={handleSubmit} onCancel={onClose} />;
       case LogType.FEED:
-        return <FeedForm key={existingLog?.id || 'f_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} existingData={existingLog} />;
+        return <FeedForm key={existingLog?.id || 'f_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} foodTypes={foodTypes} onSave={handleSubmit} onCancel={onClose} />;
       case LogType.TEMPERATURE:
-      case LogType.MISTING: // Ensure Exotic Misting correctly mounts the Temp form layout
-        return <TemperatureForm key={existingLog?.id || 't_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} existingData={existingLog} logType={logType} />;
+        return <TemperatureForm key={existingLog?.id || 't_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} onSave={handleSubmit} onCancel={onClose} />;
       case LogType.BIRTH:
-        return <BirthForm onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} animal={animal} />;
+        return <BirthForm animal={animal} date={date} userInitials={userInitials} onSave={handleSubmit} onCancel={onClose} />;
       default:
-        return <StandardForm key={existingLog?.id || 's_new'} onSubmit={handleSubmit} isSubmitting={isSubmitting} onCancel={onClose} logType={logType} animal={animal} existingData={existingLog} />;
+        return <StandardForm key={existingLog?.id || 's_new'} logType={logType} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} eventTypes={eventTypes} onSave={handleSubmit} onCancel={onClose} />;
     }
   };
 
@@ -78,7 +80,7 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
                 type="button"
                 onClick={() => setLogType(type)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-                  logType === type ? 'bg-blue-100 text-blue-700 shadow-sm border border-blue-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent'
+                  logType === type ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'
                 }`}
               >
                 {type}

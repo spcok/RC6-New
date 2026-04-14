@@ -5,7 +5,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { Animal, AnimalCategory, LogType, LogEntry } from '../../../types';
 import { getMaidstoneDailyWeather } from '../../../services/weatherService';
 
-
 interface Props {
   animal: Animal;
   date: string;
@@ -62,11 +61,7 @@ export default function TemperatureForm({ animal, date, userInitials, existingLo
         onCancel();
       } catch (err: unknown) {
         console.error("Submission Error:", err);
-        if (err instanceof Error) {
-          alert(`Database Error: ${err.message}`);
-        } else {
-          alert('Failed to save log');
-        }
+        alert('Failed to save log');
       } finally {
         setIsSubmitting(false);
       }

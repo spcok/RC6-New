@@ -35,22 +35,18 @@ export default function StandardForm({ logType, animal, date, userInitials, exis
         const safePayload = standardSchema.parse(value);
         const payload: Partial<LogEntry> = {
           id: existingLog?.id || uuidv4(),
-          animal_id: animal.id,
-          log_type: logType,
-          log_date: date,
-          user_initials: userInitials,
+          animalId: animal.id, // VITAL FIX: Was animal_id in RC5, fixed to camelCase!
+          logType: logType,
+          logDate: date,
+          userInitials: userInitials,
           value: safePayload.value,
           notes: safePayload.notes
         };
         await onSave(payload);
-        onCancel(); // Force modal to close on success
+        onCancel(); 
       } catch (err: unknown) {
         console.error("Submission Error:", err);
-        if (err instanceof Error) {
-          alert(`Database Error: ${err.message}`);
-        } else {
-          alert('Failed to save log');
-        }
+        alert('Failed to save log');
       } finally {
         setIsSubmitting(false);
       }
