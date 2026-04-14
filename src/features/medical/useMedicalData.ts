@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
-import { medicalLogsCollection, marChartsCollection, quarantineRecordsCollection } from '../../lib/database';
+import { medicalLogsCollection, marChartsCollection, quarantineRecordsCollection } from '../../lib/db';
 import { ClinicalNote, MARChart, QuarantineRecord } from '../../types';
 
 export const useMedicalData = (animalId?: string) => {

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AnimalCategory, DailyRound, LogType } from '../../types';
 import { useLiveQuery } from '@tanstack/react-db';
-import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '../../lib/database';
+import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '../../lib/db';
 
 interface AnimalCheckState {
     isAlive?: boolean;

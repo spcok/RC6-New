@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { directoryCollection } from '../../lib/database';
+import { directoryCollection } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 import { Contact } from '../../types';
 

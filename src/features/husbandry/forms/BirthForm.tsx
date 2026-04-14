@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { LogType, LogEntry, Animal } from '../../../types';
-import { animalsCollection } from '../../../lib/database';
+import { animalsCollection } from '../../../lib/db';
 
 const birthSchema = z.object({
   litterSize: z.number().min(0, 'Litter size must be at least 0'),

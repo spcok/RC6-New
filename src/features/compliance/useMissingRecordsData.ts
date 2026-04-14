@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { animalsCollection, dailyLogsCollection, medicalLogsCollection } from '../../lib/database';
+import { animalsCollection, dailyLogsCollection, medicalLogsCollection } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 import { LogType, Animal, ClinicalNote, DailyLog } from '../../types';
 import { mapToCamelCase } from '../../lib/dataMapping';

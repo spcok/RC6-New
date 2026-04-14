@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { transfersCollection } from '../../lib/database';
+import { transfersCollection } from '../../lib/db';
 
 export const useTransfersData = () => {
   const { data: transfers = [], isLoading } = useLiveQuery((q) => q.from({ item: transfersCollection }));

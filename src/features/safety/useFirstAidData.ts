@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { firstAidCollection } from '../../lib/database';
+import { firstAidCollection } from '../../lib/db';
 import { FirstAidLog } from '../../types';
 
 export const useFirstAidData = () => {

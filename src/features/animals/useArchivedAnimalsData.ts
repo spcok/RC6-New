@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { animalsCollection } from '../../lib/database';
+import { animalsCollection } from '../../lib/db';
 
 export function useArchivedAnimalsData() {
   const { data: animals = [], isLoading } = useQuery({

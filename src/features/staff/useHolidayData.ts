@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { holidaysCollection } from '../../lib/database';
+import { holidaysCollection } from '../../lib/db';
 import { Holiday } from '../../types';
 
 export const useHolidayData = () => {

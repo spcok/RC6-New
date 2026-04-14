@@ -5,7 +5,7 @@ import { useForm } from '@tanstack/react-form';
 import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 import { Loader2, X } from 'lucide-react';
-import { animalsCollection } from '../../lib/database';
+import { animalsCollection } from '../../lib/db';
 
 interface Props {
   isOpen: boolean;
