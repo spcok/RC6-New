@@ -1,49 +1,33 @@
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
-import { mapToCamelCase } from '../lib/dataMapping';
 
 export function useSupabaseRealtime() {
   useEffect(() => {
-    const channel = supabase
-      .channel('global-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public' },
-        (payload) => {
-          const tableName = payload.table;
-          
-          if (payload.eventType === 'INSERT') {
-            const newItem = mapToCamelCase(payload.new);
-            queryClient.setQueryData([tableName], (oldData: unknown[]) => {
-              return oldData ? [...oldData, newItem] : [newItem];
-            });
-          } 
-          else if (payload.eventType === 'UPDATE') {
-            const updatedItem = mapToCamelCase(payload.new);
-            queryClient.setQueryData([tableName], (oldData: unknown[]) => {
-              if (!oldData) return [updatedItem];
-              return oldData.map((item: unknown) => (item as { id: string }).id === updatedItem.id ? updatedItem : item);
-            });
-          } 
-          else if (payload.eventType === 'DELETE') {
-            queryClient.setQueryData([tableName], (oldData: unknown[]) => {
-              if (!oldData) return [];
-              return oldData.filter((item: unknown) => (item as { id: string }).id !== payload.old.id);
-            });
-          }
-        }
-      )
-      // FIX: Explicitly providing the callback prevents Supabase from crashing 
-      // when proxy interceptors or incognito mode block the WebSocket.
-      .subscribe((status, err) => {
-        if (err) {
-          console.warn('[Realtime] WebSocket blocked or degraded (Safe to ignore in offline-first mode):', err);
-        } else {
-          console.log(`[Realtime] Connection Status: ${status}`);
-        }
-      });
+    // 1. React 19 / HMR FIX: Forcefully remove any existing channel with this name
+    // before creating a new one, preventing the "after subscribe" crash.
+    supabase.removeChannel(supabase.channel('global-db-changes'));
 
+    // 2. Create a completely fresh channel
+    const channel = supabase.channel('global-db-changes');
+
+    // 3. ALWAYS attach .on() listeners BEFORE calling .subscribe()
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public' },
+      (payload) => {
+        console.log('🔄 [Realtime] Change detected:', payload);
+        if (payload.table) {
+          // Standard TanStack Query invalidation to trigger UI updates
+          queryClient.invalidateQueries({ queryKey: [payload.table] });
+        }
+      }
+    ).subscribe((status, err) => {
+      console.log(`[Realtime] Connection Status: ${status}`);
+      if (err) console.error('[Realtime] Error:', err);
+    });
+
+    // 4. Clean up gracefully on unmount
     return () => {
       supabase.removeChannel(channel);
     };
