@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useDailyLogData } from './useDailyLogData';
 import { AnimalCategory, LogType } from '../../types';
 import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -16,15 +16,14 @@ export default function DailyLog() {
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedAnimal, setSelectedAnimal] = useState<any>(null);
-  // NEW: Captures which specific type of log was clicked so the modal opens straight to it
   const [initialLogType, setInitialLogType] = useState<LogType>(LogType.WEIGHT);
 
   const { animals, dailyLogs, isLoading, addLogEntry, updateLogEntry } = useDailyLogData(viewDate, activeTab);
 
-  // SAFE DATA RETRIEVAL (Bypasses Vite crash)
-  const getTodayLog = useCallback((animalId: string, logType: LogType) => {
+  // SAFE RETRIEVAL: Prevents Vite crash
+  const getTodayLog = (animalId: string, logType: LogType) => {
     return dailyLogs.find(log => log.animalId === animalId && log.logType === logType);
-  }, [dailyLogs]);
+  };
 
   const handleSaveLog = async (entry: any) => {
     try {
@@ -157,7 +156,7 @@ export default function DailyLog() {
               animal={selectedAnimal}
               initialDate={viewDate}
               defaultLogType={initialLogType}
-              dailyLogs={dailyLogs} // Passing the raw array directly to the modal
+              dailyLogs={dailyLogs}
           />
       )}
     </div>

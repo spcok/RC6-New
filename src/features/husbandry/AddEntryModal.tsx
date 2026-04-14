@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { Animal, LogType, LogEntry, AnimalCategory } from '../../types';
+import { Animal, LogType, LogEntry } from '../../types';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
 
-// Import your beautiful RC5 Modular Forms
 import WeightForm from './forms/WeightForm';
 import FeedForm from './forms/FeedForm';
 import TemperatureForm from './forms/TemperatureForm';
@@ -18,33 +17,33 @@ interface AddEntryModalProps {
   animal?: Animal;
   initialDate?: string;
   defaultLogType?: LogType;
-  dailyLogs?: LogEntry[]; // Array passed safely from DailyLog to bypass Vite crashes
+  dailyLogs?: LogEntry[];
 }
 
 export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialDate, defaultLogType = LogType.WEIGHT, dailyLogs = [] }: AddEntryModalProps) {
   const [logType, setLogType] = useState<LogType>(defaultLogType);
   
-  // Extracting data exactly as your RC5 forms expect
   const user = useAuthStore(state => state.user);
   const userInitials = user?.initials || 'UNK';
-  const { lists } = useOperationalLists();
-  const foodTypes = lists.filter(l => l.listType === 'FOOD_TYPE') || [];
-  const eventTypes = lists.filter(l => l.listType === 'EVENT_TYPE').map(l => l.value) || [];
+  
+  // THE CRASH FIX: Safe fallback to empty array to prevent undefined .filter errors!
+  const operationalData = useOperationalLists() || {};
+  const safeLists = operationalData.lists || []; 
+  const foodTypes = safeLists.filter(l => l.listType === 'FOOD_TYPE');
+  const eventTypes = safeLists.filter(l => l.listType === 'EVENT_TYPE').map(l => l.value);
 
   if (!isOpen || !animal) return null;
 
   const date = initialDate || new Date().toISOString().split('T')[0];
 
   const handleSubmit = async (payload: any) => {
-    // The RC5 forms already perfectly construct the UUID and the DB payload.
     await onSave(payload);
   };
 
   const renderForm = () => {
-    // Inline array scan: Finds the exact log for editing without triggering a Vite hot-reload crash
+    // Finds existing logs safely
     const existingLog = dailyLogs.find(l => l.animalId === animal.id && l.logType === logType);
 
-    // The key={existingLog?.id} forces TanStack forms to repopulate defaultValues cleanly
     switch (logType) {
       case LogType.WEIGHT:
         return <WeightForm key={existingLog?.id || 'w_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} onSave={handleSubmit} onCancel={onClose} />;

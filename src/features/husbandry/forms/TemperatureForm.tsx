@@ -18,7 +18,6 @@ interface Props {
 export default function TemperatureForm({ animal, date, userInitials, existingLog, defaultTemperature, onSave, onCancel }: Props) {
   const isExotic = animal.category === AnimalCategory.EXOTICS;
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm({
@@ -30,7 +29,6 @@ export default function TemperatureForm({ animal, date, userInitials, existingLo
     },
     onSubmit: async ({ value }) => {
       setError(null);
-      setIsSubmitting(true);
       try {
         if (isExotic && (value.baskingTemp === undefined || value.coolTemp === undefined)) {
           throw new Error('Both Basking and Cool temperatures are required for exotics.');
@@ -61,9 +59,7 @@ export default function TemperatureForm({ animal, date, userInitials, existingLo
         onCancel();
       } catch (err: unknown) {
         console.error("Submission Error:", err);
-        alert('Failed to save log');
-      } finally {
-        setIsSubmitting(false);
+        setError('Failed to save log');
       }
     }
   });
@@ -87,28 +83,34 @@ export default function TemperatureForm({ animal, date, userInitials, existingLo
       
       {isExotic ? (
         <div className="grid grid-cols-2 gap-4">
-          <form.Field name="baskingTemp" children={(field) => (
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Basking Temp (°C)</label>
-              <input type="number" value={field.state.value ?? ''} onChange={e => field.handleChange(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold" required />
-            </div>
-          )} />
-          <form.Field name="coolTemp" children={(field) => (
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Cool Temp (°C)</label>
-              <input type="number" value={field.state.value ?? ''} onChange={e => field.handleChange(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold" required />
-            </div>
-          )} />
+          <form.Field name="baskingTemp">
+            {(field) => (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Basking Temp (°C)</label>
+                <input type="number" value={field.state.value ?? ''} onChange={e => field.handleChange(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold" required />
+              </div>
+            )}
+          </form.Field>
+          <form.Field name="coolTemp">
+            {(field) => (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Cool Temp (°C)</label>
+                <input type="number" value={field.state.value ?? ''} onChange={e => field.handleChange(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold" required />
+              </div>
+            )}
+          </form.Field>
         </div>
       ) : (
         <div>
           <div className="flex items-end gap-2">
-            <form.Field name="temperature" children={(field) => (
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Temperature (°C)</label>
-                <input type="number" value={field.state.value ?? ''} onChange={e => field.handleChange(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold" required disabled={isWeatherLoading} />
-              </div>
-            )} />
+            <form.Field name="temperature">
+              {(field) => (
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Temperature (°C)</label>
+                  <input type="number" value={field.state.value ?? ''} onChange={e => field.handleChange(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold" required disabled={isWeatherLoading} />
+                </div>
+              )}
+            </form.Field>
             <button type="button" onClick={handleFetchWeather} disabled={isWeatherLoading} className="px-4 py-3 bg-sky-50 text-sky-700 border-2 border-sky-200 rounded-xl font-bold text-xs uppercase hover:bg-sky-100 flex items-center gap-2 transition-colors disabled:opacity-50">
               {isWeatherLoading ? <Loader2 size={14} className="animate-spin" /> : '☁️ Fetch 13:00'}
             </button>
@@ -117,19 +119,25 @@ export default function TemperatureForm({ animal, date, userInitials, existingLo
       )}
 
       {!isExotic && (
-        <form.Field name="notes" children={(field) => (
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Notes</label>
-            <textarea value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-medium text-xs min-h-[100px] resize-none" />
-          </div>
-        )} />
+        <form.Field name="notes">
+          {(field) => (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Notes</label>
+              <textarea value={field.state.value} onChange={e => field.handleChange(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-medium text-xs min-h-[100px] resize-none" />
+            </div>
+          )}
+        </form.Field>
       )}
 
       <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
         <button type="button" onClick={onCancel} className="px-6 py-3 bg-white border-2 text-slate-600 rounded-xl font-bold uppercase text-xs">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2">
-          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
-        </button>
+        <form.Subscribe selector={(state) => [state.isSubmitting]}>
+          {([isSubmitting]) => (
+            <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase text-xs flex items-center gap-2 disabled:opacity-50">
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
+            </button>
+          )}
+        </form.Subscribe>
       </div>
     </form>
   );

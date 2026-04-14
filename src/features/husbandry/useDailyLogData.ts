@@ -38,7 +38,6 @@ export const useDailyLogData = (viewDate: string, activeCategory: string) => {
             ...entry
         });
     }, 
-    // Safely added update function
     updateLogEntry: async (id: string, entry: Partial<LogEntry>) => {
       await dailyLogsCollection.update(id, (old: LogEntry) => ({ 
           ...old, 
