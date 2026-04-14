@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { useLiveQuery } from '@tanstack/react-db';
 import { useAuthStore } from '../../store/authStore';
 import { Animal, LogType, LogEntry } from '../../types';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
+import { usersCollection } from '../../lib/database';
 
 import WeightForm from './forms/WeightForm';
 import FeedForm from './forms/FeedForm';
@@ -23,16 +25,23 @@ interface AddEntryModalProps {
 export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialDate, defaultLogType = LogType.WEIGHT, dailyLogs = [] }: AddEntryModalProps) {
   const [logType, setLogType] = useState<LogType>(defaultLogType);
   
-  const user = useAuthStore(state => state.user);
-  const userInitials = user?.initials || 'UNK';
+  // 1. Get raw session ID
+  const authUser = useAuthStore(state => state.user);
   
+  // 2. Query TanStack DB directly for the official User Profile & Initials
+  const { data: localUsers = [] } = useLiveQuery((q) => q.from({ item: usersCollection }));
+  const localDbProfile = localUsers.find((u: any) => u.id === authUser?.id);
+  const userInitials = localDbProfile?.initials || authUser?.initials || 'UNK';
+  
+  // 3. Query TanStack DB (via your hook) for the Operational Lists
   const operationalData = useOperationalLists() || {};
   const safeLists = operationalData.lists || []; 
   
-  // THE FIX: Case-insensitive mapping so it successfully pulls `food_type` and `feed_method` from Supabase
-  const foodTypes = safeLists.filter(l => l.listType?.toLowerCase() === 'food_type');
-  const feedMethods = safeLists.filter(l => l.listType?.toLowerCase() === 'feed_method');
-  const eventTypes = safeLists.filter(l => l.listType?.toLowerCase() === 'event_type').map(l => l.value);
+  // 4. Safely filter the database snake_case list types
+  const getListType = (l: any) => String(l.listType || l.list_type || '').toLowerCase();
+  const foodTypes = safeLists.filter(l => getListType(l) === 'food_type');
+  const feedMethods = safeLists.filter(l => getListType(l) === 'feed_method');
+  const eventTypes = safeLists.filter(l => getListType(l) === 'event_type').map(l => l.value);
 
   if (!isOpen || !animal) return null;
 
@@ -43,6 +52,7 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
   };
 
   const renderForm = () => {
+    // Find the existing log safely without crashing Vite
     const existingLog = dailyLogs.find(l => l.animalId === animal.id && l.logType === logType);
 
     switch (logType) {
