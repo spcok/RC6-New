@@ -27,11 +27,12 @@ interface FeedFormProps {
   userInitials: string;
   existingLog?: LogEntry;
   foodTypes: OperationalList[];
+  feedMethods: OperationalList[]; // NEW: Now perfectly mapped
   onSave: (entry: Partial<LogEntry>) => Promise<void>;
   onCancel: () => void;
 }
 
-export default function FeedForm({ animal, date, userInitials, existingLog, foodTypes, onSave, onCancel }: FeedFormProps) {
+export default function FeedForm({ animal, date, userInitials, existingLog, foodTypes, feedMethods, onSave, onCancel }: FeedFormProps) {
   const isBird = animal.category === AnimalCategory.OWLS || animal.category === AnimalCategory.RAPTORS;
   const isExotic = animal.category === AnimalCategory.EXOTICS;
 
@@ -184,13 +185,17 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
             {(field) => (
               <div className="sm:col-span-2">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Method of Feeding</label>
-                <input 
-                  type="text" 
+                {/* THE FIX: Replaced input with dynamic dropdown */}
+                <select 
                   value={field.state.value} 
                   onChange={e => field.handleChange(e.target.value)} 
-                  className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-emerald-500" 
-                  placeholder={isBird ? "e.g. Yolked, Gutted, Skinned, Block..." : "e.g. Tongs, Scatter, Bowl..."} 
-                />
+                  className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-emerald-500"
+                >
+                  <option value="">Select Method...</option>
+                  {feedMethods.map(m => (
+                    <option key={m.id} value={m.value}>{m.value}</option>
+                  ))}
+                </select>
               </div>
             )}
           </form.Field>

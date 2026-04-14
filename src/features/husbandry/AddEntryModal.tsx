@@ -26,11 +26,13 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
   const user = useAuthStore(state => state.user);
   const userInitials = user?.initials || 'UNK';
   
-  // THE CRASH FIX: Safe fallback to empty array to prevent undefined .filter errors!
   const operationalData = useOperationalLists() || {};
   const safeLists = operationalData.lists || []; 
-  const foodTypes = safeLists.filter(l => l.listType === 'FOOD_TYPE');
-  const eventTypes = safeLists.filter(l => l.listType === 'EVENT_TYPE').map(l => l.value);
+  
+  // THE FIX: Case-insensitive mapping so it successfully pulls `food_type` and `feed_method` from Supabase
+  const foodTypes = safeLists.filter(l => l.listType?.toLowerCase() === 'food_type');
+  const feedMethods = safeLists.filter(l => l.listType?.toLowerCase() === 'feed_method');
+  const eventTypes = safeLists.filter(l => l.listType?.toLowerCase() === 'event_type').map(l => l.value);
 
   if (!isOpen || !animal) return null;
 
@@ -41,14 +43,13 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
   };
 
   const renderForm = () => {
-    // Finds existing logs safely
     const existingLog = dailyLogs.find(l => l.animalId === animal.id && l.logType === logType);
 
     switch (logType) {
       case LogType.WEIGHT:
         return <WeightForm key={existingLog?.id || 'w_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} onSave={handleSubmit} onCancel={onClose} />;
       case LogType.FEED:
-        return <FeedForm key={existingLog?.id || 'f_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} foodTypes={foodTypes} onSave={handleSubmit} onCancel={onClose} />;
+        return <FeedForm key={existingLog?.id || 'f_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} foodTypes={foodTypes} feedMethods={feedMethods} onSave={handleSubmit} onCancel={onClose} />;
       case LogType.TEMPERATURE:
         return <TemperatureForm key={existingLog?.id || 't_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} onSave={handleSubmit} onCancel={onClose} />;
       case LogType.BIRTH:
