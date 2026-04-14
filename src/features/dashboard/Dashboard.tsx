@@ -6,7 +6,7 @@ import AnimalFormModal from '../animals/AnimalFormModal';
 import { useDashboardData, EnhancedAnimal, PendingTask } from './useDashboardData';
 import { usePermissions } from '../../hooks/usePermissions';
 
-import { animalsCollection } from '../../lib/db';
+import { animalsCollection } from '@/src/lib/db';
 
 // --- DND-KIT IMPORTS ---
 import {

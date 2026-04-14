@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { safetyDrillsCollection } from '../../lib/db';
+import { safetyDrillsCollection } from '@/src/lib/db';
 import { SafetyDrill } from '../../types';
 
 export const useSafetyDrillData = () => {

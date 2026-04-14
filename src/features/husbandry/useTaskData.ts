@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { tasksCollection } from '../../lib/db';
+import { tasksCollection } from '@/src/lib/db';
 import { Task } from '../../types';
 
 export const useTaskData = () => {

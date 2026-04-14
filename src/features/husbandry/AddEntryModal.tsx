@@ -4,7 +4,7 @@ import { useLiveQuery } from '@tanstack/react-db';
 import { useAuthStore } from '../../store/authStore';
 import { Animal, LogType, LogEntry } from '../../types';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
-import { usersCollection } from '../../lib/db';
+import { usersCollection } from '@/src/lib/db';
 
 import WeightForm from './forms/WeightForm';
 import FeedForm from './forms/FeedForm';

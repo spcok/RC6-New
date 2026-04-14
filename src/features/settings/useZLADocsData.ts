@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { zlaDocumentsCollection } from '../../lib/db';
+import { zlaDocumentsCollection } from '@/src/lib/db';
 import { supabase } from '../../lib/supabase';
 import { ZLADocument } from '../../types';
 

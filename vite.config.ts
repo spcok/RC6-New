@@ -7,8 +7,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      // FIX: Map '@' to the project root, not the src folder, 
-      // so '@/src/types' resolves correctly.
+      // FIXED: Maps '@' to the project root, allowing '@/src/...' to resolve correctly.
       '@': path.resolve(__dirname, './'),
     },
   },
@@ -19,7 +18,6 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
-  // PREVENT WASM COMPILATION CRASHES
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm'],
   },

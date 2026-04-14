@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { orgSettingsCollection } from '../../lib/db';
+import { orgSettingsCollection } from '@/src/lib/db';
 import { supabase } from '../../lib/supabase';
 import { OrgProfileSettings } from '../../types';
 import { mapToCamelCase } from '../../lib/dataMapping';

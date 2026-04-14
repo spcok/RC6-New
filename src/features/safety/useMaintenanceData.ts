@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { maintenanceCollection } from '../../lib/db';
+import { maintenanceCollection } from '@/src/lib/db';
 import { MaintenanceLog } from '../../types';
 
 export const useMaintenanceData = () => {

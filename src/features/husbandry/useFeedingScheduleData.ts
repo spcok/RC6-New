@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { dailyLogsCollection } from '../../lib/db';
+import { dailyLogsCollection } from '@/src/lib/db';
 import { supabase } from '../../lib/supabase';
 import { LogEntry, LogType } from '../../types';
 import { mapToCamelCase } from '../../lib/dataMapping';

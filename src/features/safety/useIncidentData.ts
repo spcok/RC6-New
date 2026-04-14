@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { incidentsCollection } from '../../lib/db';
+import { incidentsCollection } from '@/src/lib/db';
 import { Incident } from '../../types';
 
 export const useIncidentData = () => {

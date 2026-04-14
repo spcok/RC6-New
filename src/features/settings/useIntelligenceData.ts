@@ -1,5 +1,5 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { animalsCollection } from '../../lib/db';
+import { animalsCollection } from '@/src/lib/db';
 
 export const useIntelligenceData = () => {
   const { data: animals = [], isLoading } = useLiveQuery(animalsCollection);

@@ -13,7 +13,6 @@ declare global {
 }
 
 export async function initPersistentStorage() {
-  // Return the existing connection if it survived the reload
   if (globalThis.__koa_db_persistence) {
     return { 
       persistence: globalThis.__koa_db_persistence, 
@@ -37,8 +36,7 @@ export async function initPersistentStorage() {
     globalThis.__koa_db_persistence = persistence;
     globalThis.__koa_db_coordinator = coordinator;
 
-    // VITE HMR FIX: This specifically prevents the OPFS lock crash.
-    // When Vite detects a code change, it tells the coordinator to drop the lock.
+    // VITE HMR GUARD: Prevents sqlite3_open_v2 locking crashes
     if (import.meta.hot) {
       import.meta.hot.dispose(async () => {
         console.log('🧹 [HMR] Releasing SQLite OPFS locks for hot reload...');
@@ -55,3 +53,10 @@ export async function initPersistentStorage() {
     throw err;
   }
 }
+
+// 1. Await the DB initialization
+const { persistence, coordinator } = await initPersistentStorage();
+
+// 2. EXPLICIT STATIC EXPORT (Satisfies Vite's strict import analysis)
+export const sqlitePersistence = persistence;
+export const dbCoordinator = coordinator;
