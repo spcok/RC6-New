@@ -28,14 +28,17 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
   const { data: rawAnimals = [], isLoading: animalsLoading } = useLiveQuery((q) => 
     q.from({ item: animalsCollection })
   );
+  console.log('🔍 [LiveQuery] Animals:', rawAnimals, '| Loading:', animalsLoading);
 
   const { data: rawLogs = [], isLoading: logsLoading } = useLiveQuery((q) => 
     q.from({ item: dailyLogsCollection })
   );
+  console.log('🔍 [LiveQuery] Logs:', rawLogs, '| Loading:', logsLoading);
 
   const { data: rawTasks = [], isLoading: tasksLoading } = useLiveQuery((q) => 
     q.from({ item: tasksCollection })
   );
+  console.log('🔍 [LiveQuery] Tasks:', rawTasks, '| Loading:', tasksLoading);
 
   const isLoading = animalsLoading || logsLoading || tasksLoading;
 

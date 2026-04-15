@@ -32,9 +32,6 @@ export const useUsersData = () => {
   });
 
   const updateUserMutation = useMutation({
-    onMutate: async (user: UserProfile) => {
-      await usersCollection.sync(user);
-    },
     mutationFn: async (user: Partial<UserProfile> & { id: string }) => {
       const supabasePayload = {
         name: user.name,

@@ -17,7 +17,7 @@ export const useOfflinePreloader = () => {
       console.log('📡 [Sync] Force-starting hydration...');
       
       // 1. Preload Active Animals
-      const animalsRes = await supabase.from('animals').select('*').eq('status', 'ACTIVE');
+      const animalsRes = await supabase.from('animals').select('id, name, species, category, is_deleted');
       console.log('📊 [Supabase Payload] Animals:', animalsRes.data, '| Error:', animalsRes.error);
       
       await queryClient.prefetchQuery({

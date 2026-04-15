@@ -88,7 +88,7 @@ const NAVIGATION_GROUPS = [
 export default function Layout() {
   useSupabaseRealtime();
   const { isReady } = useOfflinePreloader();
-  // console.log('Vault Sync Ready:', isReady);
+  console.log('Vault Sync Ready:', isReady);
   const location = useLocation();
   const currentUser = useAuthStore(s => s.currentUser);
   const logout = useAuthStore(s => s.logout);

@@ -42,12 +42,6 @@ export function useMissingRecordsData() {
         const { data, error } = await supabase.from('animals').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<Animal>(data as Record<string, unknown>[]) as Animal[];
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await animalsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving animals from local vault.");
@@ -63,12 +57,6 @@ export function useMissingRecordsData() {
         const { data, error } = await supabase.from('daily_logs').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<DailyLog>(data as Record<string, unknown>[]) as DailyLog[];
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await dailyLogsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving daily logs from local vault.");
@@ -84,12 +72,6 @@ export function useMissingRecordsData() {
         const { data, error } = await supabase.from('medical_logs').select('*');
         if (error) throw error;
         const mappedData = mapToCamelCase<ClinicalNote>(data as Record<string, unknown>[]) as ClinicalNote[];
-        // Refresh local vault (Upsert Pattern)
-        setTimeout(async () => {
-          for (const item of mappedData) {
-            await medicalLogsCollection.sync(item);
-          }
-        }, 0);
         return mappedData;
       } catch {
         console.warn("Network unreachable. Serving medical logs from local vault.");

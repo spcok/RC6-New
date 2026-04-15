@@ -26,7 +26,6 @@ export const useZLADocsData = () => {
   const addDocumentMutation = useMutation({
     mutationFn: async (doc: Omit<ZLADocument, 'id'>) => {
       const payload = { ...doc, id: crypto.randomUUID() } as ZLADocument;
-      await zlaDocumentsCollection.sync(payload);
       
       const { error } = await supabase.from('zla_documents').insert([payload]);
       if (error) throw error;

@@ -39,10 +39,6 @@ export function useOrgSettings() {
   });
 
   const saveSettingsMutation = useMutation({
-    onMutate: async (newSettings: OrgProfileSettings) => {
-      await orgSettingsCollection.sync(newSettings);
-      return { newSettings };
-    },
     mutationFn: async (newSettings: OrgProfileSettings) => {
       const supabasePayload = {
         id: newSettings.id || 'profile',

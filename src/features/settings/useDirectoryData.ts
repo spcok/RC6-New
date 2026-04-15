@@ -26,7 +26,6 @@ export const useDirectoryData = () => {
   const addContactMutation = useMutation({
     mutationFn: async (contact: Omit<Contact, 'id'>) => {
       const payload = { ...contact, id: crypto.randomUUID(), is_deleted: false } as Contact;
-      await directoryCollection.sync(payload);
       
       const { error } = await supabase.from('directory').insert([payload]);
       if (error) throw error;
