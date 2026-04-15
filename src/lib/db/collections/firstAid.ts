@@ -10,5 +10,6 @@ export const firstAidCollection = createCollection(
     id: 'firstAid',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

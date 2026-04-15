@@ -10,5 +10,6 @@ export const roundsCollection = createCollection(
     id: 'rounds',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

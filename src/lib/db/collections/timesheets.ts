@@ -10,5 +10,6 @@ export const timesheetsCollection = createCollection(
     id: 'timesheets',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

@@ -10,5 +10,6 @@ export const dailyLogsCollection = createCollection(
     id: 'dailyLogs',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

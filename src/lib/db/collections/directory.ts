@@ -10,5 +10,6 @@ export const directoryCollection = createCollection(
     id: 'directory',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

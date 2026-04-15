@@ -10,5 +10,6 @@ export const orgSettingsCollection = createCollection(
     id: 'orgSettings',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

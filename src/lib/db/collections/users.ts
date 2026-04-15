@@ -10,5 +10,6 @@ export const usersCollection = createCollection(
     id: 'users',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

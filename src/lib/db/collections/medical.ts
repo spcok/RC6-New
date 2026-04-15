@@ -10,5 +10,6 @@ export const medicalCollection = createCollection(
     id: 'medical',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

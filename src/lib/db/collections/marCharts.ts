@@ -10,5 +10,6 @@ export const marChartsCollection = createCollection(
     id: 'marCharts',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

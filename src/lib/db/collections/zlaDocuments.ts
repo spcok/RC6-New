@@ -10,5 +10,6 @@ export const zlaDocumentsCollection = createCollection(
     id: 'zlaDocuments',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

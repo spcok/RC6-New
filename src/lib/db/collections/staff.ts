@@ -10,5 +10,6 @@ export const staffCollection = createCollection(
     id: 'staff',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

@@ -10,5 +10,6 @@ export const tasksCollection = createCollection(
     id: 'tasks',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

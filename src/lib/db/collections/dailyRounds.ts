@@ -10,5 +10,6 @@ export const dailyRoundsCollection = createCollection(
     id: 'dailyRounds',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

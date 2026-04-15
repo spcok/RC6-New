@@ -10,5 +10,6 @@ export const operationalListsCollection = createCollection(
     id: 'operationalLists',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

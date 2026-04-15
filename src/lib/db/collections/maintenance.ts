@@ -10,5 +10,6 @@ export const maintenanceCollection = createCollection(
     id: 'maintenance',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

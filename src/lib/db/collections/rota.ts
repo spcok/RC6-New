@@ -10,5 +10,6 @@ export const rotaCollection = createCollection(
     id: 'rota',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

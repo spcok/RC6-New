@@ -10,5 +10,6 @@ export const holidaysCollection = createCollection(
     id: 'holidays',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

@@ -10,5 +10,6 @@ export const movementsCollection = createCollection(
     id: 'movements',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );

@@ -10,5 +10,6 @@ export const quarantineRecordsCollection = createCollection(
     id: 'quarantineRecords',
     persistence: sqlitePersistence,
     schemaVersion: 1,
+    sync: null,
   })
 );
