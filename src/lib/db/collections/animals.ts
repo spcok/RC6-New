@@ -1,7 +1,14 @@
-import { createCollection } from '@tanstack/db';
+import { createCollection, localOnlyCollectionOptions } from '@tanstack/db';
+import { persistedCollectionOptions } from '@tanstack/browser-db-sqlite-persistence';
 import { sqlitePersistence } from '../persistence';
 
-export const animalsCollection = createCollection({
-  id: 'animals',
-  persistence: sqlitePersistence,
-});
+export const animalsCollection = createCollection(
+  persistedCollectionOptions({
+    ...localOnlyCollectionOptions({
+      getKey: (item: any) => item.id,
+    }),
+    id: 'animals',
+    persistence: sqlitePersistence,
+    schemaVersion: 1,
+  })
+);

@@ -1,7 +1,14 @@
-import { createCollection } from '@tanstack/db';
+import { createCollection, localOnlyCollectionOptions } from '@tanstack/db';
+import { persistedCollectionOptions } from '@tanstack/browser-db-sqlite-persistence';
 import { sqlitePersistence } from '../persistence';
 
-export const orgSettingsCollection = createCollection({
-  id: 'orgSettings',
-  persistence: sqlitePersistence,
-});
+export const orgSettingsCollection = createCollection(
+  persistedCollectionOptions({
+    ...localOnlyCollectionOptions({
+      getKey: (item: any) => item.id,
+    }),
+    id: 'orgSettings',
+    persistence: sqlitePersistence,
+    schemaVersion: 1,
+  })
+);
