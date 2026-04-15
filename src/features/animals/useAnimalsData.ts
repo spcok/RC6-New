@@ -4,7 +4,7 @@ import { Animal } from '../../types';
 
 export const useAnimalsData = () => {
   const { data: animals = [], isLoading } = useLiveQuery((q) => 
-    q.from({ item: animalsCollection })
+    q.from({ item: animalsCollection }).select((row) => row.item)
   );
 
   const filteredAnimals = animals.filter((animal: Animal) => !animal.isDeleted && !animal.archived);

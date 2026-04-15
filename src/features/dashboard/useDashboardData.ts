@@ -26,17 +26,17 @@ export interface PendingTask {
 export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDate: string) {
   
   const { data: rawAnimals = [], isLoading: animalsLoading } = useLiveQuery((q) => 
-    q.from({ item: animalsCollection })
+    q.from({ item: animalsCollection }).select((row) => row.item)
   );
   console.log('🔍 [LiveQuery] Animals:', rawAnimals, '| Loading:', animalsLoading);
 
   const { data: rawLogs = [], isLoading: logsLoading } = useLiveQuery((q) => 
-    q.from({ item: dailyLogsCollection })
+    q.from({ item: dailyLogsCollection }).select((row) => row.item)
   );
   console.log('🔍 [LiveQuery] Logs:', rawLogs, '| Loading:', logsLoading);
 
   const { data: rawTasks = [], isLoading: tasksLoading } = useLiveQuery((q) => 
-    q.from({ item: tasksCollection })
+    q.from({ item: tasksCollection }).select((row) => row.item)
   );
   console.log('🔍 [LiveQuery] Tasks:', rawTasks, '| Loading:', tasksLoading);
 

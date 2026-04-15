@@ -4,7 +4,7 @@ import { FirstAidLog } from '../../types';
 
 export const useFirstAidData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: firstAidCollection })
+    q.from({ item: firstAidCollection }).select((row) => row.item)
   );
 
   const safeData = Array.isArray(data) ? data : [];

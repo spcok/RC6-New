@@ -4,7 +4,7 @@ import { MaintenanceLog } from '../../types';
 
 export const useMaintenanceData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: maintenanceCollection })
+    q.from({ item: maintenanceCollection }).select((row) => row.item)
   );
 
   // 1. Safe Array Fallback: Protects against null/undefined cache states

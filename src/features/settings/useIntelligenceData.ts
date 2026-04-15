@@ -2,7 +2,7 @@ import { useLiveQuery } from '@tanstack/react-db';
 import { animalsCollection } from '@/src/lib/db';
 
 export const useIntelligenceData = () => {
-  const { data: animals = [], isLoading } = useLiveQuery(animalsCollection);
+  const { data: animals = [], isLoading } = useLiveQuery((q) => q.from({ item: animalsCollection }).select((row) => row.item));
 
   const runIUCNScan = async () => {
     if (!navigator.onLine) {

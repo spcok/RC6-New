@@ -5,8 +5,8 @@ import { dailyLogsCollection, animalsCollection } from '@/src/lib/db';
 import { LogEntry, AnimalCategory } from '../../types';
 
 export const useDailyLogData = (viewDate: string, activeCategory: string) => {
-  const { data: logs = [], isLoading: logsLoading } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }));
-  const { data: animals = [], isLoading: animalsLoading } = useLiveQuery((q) => q.from({ item: animalsCollection }));
+  const { data: logs = [], isLoading: logsLoading } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }).select((row) => row.item));
+  const { data: animals = [], isLoading: animalsLoading } = useLiveQuery((q) => q.from({ item: animalsCollection }).select((row) => row.item));
   
   const dailyLogs = useMemo(() => {
     let result = logs.filter((log: LogEntry) => !log.isDeleted);

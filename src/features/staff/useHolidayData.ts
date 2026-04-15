@@ -4,7 +4,7 @@ import { Holiday } from '../../types';
 
 export const useHolidayData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: holidaysCollection })
+    q.from({ item: holidaysCollection }).select((row) => row.item)
   );
 
   const safeData = Array.isArray(data) ? data : [];

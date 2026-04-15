@@ -4,7 +4,7 @@ import { SafetyDrill } from '../../types';
 
 export const useSafetyDrillData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: safetyDrillsCollection })
+    q.from({ item: safetyDrillsCollection }).select((row) => row.item)
   );
 
   const safeData = Array.isArray(data) ? data : [];

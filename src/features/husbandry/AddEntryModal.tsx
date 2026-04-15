@@ -29,7 +29,7 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
   const authUser = useAuthStore(state => state.user);
   
   // 2. Query TanStack DB directly for the official User Profile & Initials
-  const { data: localUsers = [] } = useLiveQuery((q) => q.from({ item: usersCollection }));
+  const { data: localUsers = [] } = useLiveQuery((q) => q.from({ item: usersCollection }).select((row) => row.item));
   const localDbProfile = localUsers.find((u: any) => u.id === authUser?.id);
   const userInitials = localDbProfile?.initials || authUser?.initials || 'UNK';
   

@@ -4,7 +4,7 @@ import { RotaShift } from '../../types';
 
 export const useRotaData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: rotaCollection })
+    q.from({ item: rotaCollection }).select((row) => row.item)
   );
 
   const safeData = Array.isArray(data) ? data : [];

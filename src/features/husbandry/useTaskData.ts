@@ -5,7 +5,7 @@ import { Task } from '../../types';
 export const useTaskData = () => {
   // NATIVE SELECTOR: Handshake complete.
   const { data: tasks = [], isLoading } = useLiveQuery((q) => 
-    q.from({ item: tasksCollection })
+    q.from({ item: tasksCollection }).select((row) => row.item)
   );
 
   return { 

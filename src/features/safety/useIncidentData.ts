@@ -4,7 +4,7 @@ import { Incident } from '../../types';
 
 export const useIncidentData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: incidentsCollection })
+    q.from({ item: incidentsCollection }).select((row) => row.item)
   );
 
   const safeData = Array.isArray(data) ? data : [];

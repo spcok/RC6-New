@@ -13,13 +13,13 @@ interface AnimalCheckState {
 
 export function useDailyRoundData(viewDate: string) {
     // 1. REACTIVE UI with Official Selectors & Safe Arrays
-    const { data: rawAnimals, isLoading: isLoadingAnimals } = useLiveQuery((q) => q.from({ item: animalsCollection }));
+    const { data: rawAnimals, isLoading: isLoadingAnimals } = useLiveQuery((q) => q.from({ item: animalsCollection }).select((row) => row.item));
     const allAnimals = Array.isArray(rawAnimals) ? rawAnimals : [];
 
-    const { data: rawLogs, isLoading: isLoadingLogs } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }));
+    const { data: rawLogs, isLoading: isLoadingLogs } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }).select((row) => row.item));
     const liveLogs = Array.isArray(rawLogs) ? rawLogs : [];
 
-    const { data: rawRounds, isLoading: isLoadingRounds } = useLiveQuery((q) => q.from({ item: dailyRoundsCollection }));
+    const { data: rawRounds, isLoading: isLoadingRounds } = useLiveQuery((q) => q.from({ item: dailyRoundsCollection }).select((row) => row.item));
     const liveRounds = Array.isArray(rawRounds) ? rawRounds : [];
     
     const isLoading = isLoadingAnimals || isLoadingLogs || isLoadingRounds;

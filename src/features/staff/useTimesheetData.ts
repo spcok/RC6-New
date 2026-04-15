@@ -4,7 +4,7 @@ import { Timesheet } from '../../types';
 
 export const useTimesheetData = (staffName?: string) => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: timesheetsCollection })
+    q.from({ item: timesheetsCollection }).select((row) => row.item)
   );
 
   const safeData = Array.isArray(data) ? data : [];
