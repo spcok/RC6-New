@@ -24,11 +24,11 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
     updateLogEntry,
     deleteLogEntry
   } = useDailyLogData('all', 'all', effectiveAnimalId);
-  
+
   const [filter, setFilter] = useState('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<LogEntry | undefined>(undefined);
-  
+
   const filters = ['ALL', ...validHusbandryTypes];
 
   const filteredLogs = useMemo(() => {
@@ -78,11 +78,14 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
   const handleSaveLog = async (entry: Partial<LogEntry>) => {
     try {
       if (selectedLog && selectedLog.id) {
-        // EDIT: Merge the selected log with the new entry data, ensuring ID is preserved
-        const updatePayload = { ...selectedLog, ...entry, id: selectedLog.id };
+        // Create a clean payload by stripping protected backend fields
+        const { id, createdAt, updatedAt, ...cleanEntry } = entry;
+        
+        // Merge only the mutable fields
+        const updatePayload = { ...cleanEntry };
+        
         await updateLogEntry(selectedLog.id, updatePayload);
       } else {
-        // ADD: Generate a new ID if it doesn't exist
         if (!entry.id) entry.id = crypto.randomUUID();
         await addLogEntry(entry);
       }
@@ -90,10 +93,11 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
       setSelectedLog(undefined);
     } catch (err: unknown) {
       console.error('Failed to save log:', err);
+      // Force visual error display for silent failures
       if (err instanceof Error) {
-        alert(`Database Error: ${err.message}`);
+        alert(`Mutation Error: ${err.message}`);
       } else {
-        alert('Failed to save log');
+        alert('Validation or Database constraints prevented saving this log.');
       }
     }
   };
@@ -159,7 +163,7 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
                 {virtualizer.getVirtualItems().map(virtualRow => {
                   const log = filteredLogs[virtualRow.index];
                   const isSystemLog = log.userInitials === 'SYS';
-                  
+
                   return (
                     <div
                       key={virtualRow.key}
@@ -193,7 +197,7 @@ const HusbandryLogs: React.FC<HusbandryLogsProps> = ({ animalId, weightUnit = 'g
                         ) : (
                           <span className="hidden md:inline-block">{log.userInitials || '—'}</span>
                         )}
-                        
+
                         {!isSystemLog && (
                           <div className="flex items-center gap-1">
                             <button 
