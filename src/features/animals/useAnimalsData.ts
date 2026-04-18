@@ -1,10 +1,10 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { animalsCollection } from '@/src/lib/db';
+import { animalsCollection } from '../../lib/database';
 import { Animal } from '../../types';
 
 export const useAnimalsData = () => {
   const { data: animals = [], isLoading } = useLiveQuery((q) => 
-    q.from({ item: animalsCollection }).select((row) => row.item)
+    q.from({ item: animalsCollection })
   );
 
   const filteredAnimals = animals.filter((animal: Animal) => !animal.isDeleted && !animal.archived);

@@ -1,106 +1,115 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { useLiveQuery } from '@tanstack/react-db';
 import { useAuthStore } from '../../store/authStore';
-import { Animal, LogType, LogEntry } from '../../types';
+import { Animal, LogType, LogEntry, AnimalCategory } from '../../types';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
-import { usersCollection } from '@/src/lib/db';
 
+// Import the Modularized Forms
 import WeightForm from './forms/WeightForm';
 import FeedForm from './forms/FeedForm';
 import TemperatureForm from './forms/TemperatureForm';
-import StandardForm from './forms/StandardForm';
 import BirthForm from './forms/BirthForm';
+import StandardForm from './forms/StandardForm';
 
 interface AddEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (entry: any) => Promise<void>;
-  animal?: Animal;
-  initialDate?: string;
-  defaultLogType?: LogType;
-  dailyLogs?: LogEntry[];
+  onSave: (entry: Partial<LogEntry>) => Promise<void>;
+  animal: Animal;
+  initialType: LogType;
+  existingLog?: LogEntry;
+  initialDate: string;
+  defaultTemperature?: number;
 }
 
-export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialDate, defaultLogType = LogType.WEIGHT, dailyLogs = [] }: AddEntryModalProps) {
-  const [logType, setLogType] = useState<LogType>(defaultLogType);
+export default function AddEntryModal({ isOpen, onClose, onSave, animal, initialType, existingLog, initialDate, defaultTemperature }: AddEntryModalProps) {
+  const { currentUser } = useAuthStore();
   
-  // 1. Get raw session ID
-  const authUser = useAuthStore(state => state.user);
-  
-  // 2. Query TanStack DB directly for the official User Profile & Initials
-  const { data: localUsers = [] } = useLiveQuery((q) => q.from({ item: usersCollection }).select((row) => row.item));
-  const localDbProfile = localUsers.find((u: any) => u.id === authUser?.id);
-  const userInitials = localDbProfile?.initials || authUser?.initials || 'UNK';
-  
-  // 3. Query TanStack DB (via your hook) for the Operational Lists
-  const operationalData = useOperationalLists() || {};
-  const safeLists = operationalData.lists || []; 
-  
-  // 4. Safely filter the database snake_case list types
-  const getListType = (l: any) => String(l.listType || l.list_type || '').toLowerCase();
-  const foodTypes = safeLists.filter(l => getListType(l) === 'food_type');
-  const feedMethods = safeLists.filter(l => getListType(l) === 'feed_method');
-  const eventTypes = safeLists.filter(l => getListType(l) === 'event_type').map(l => l.value);
+  // Operational Lists for child forms
+  const safeCategory = animal?.category || AnimalCategory.MAMMALS;
+  const { foodTypes, eventTypes } = useOperationalLists(safeCategory);
+
+  // Global Router State
+  const [logType, setLogType] = useState<LogType>(existingLog?.logType || initialType);
+  const [date, setDate] = useState(existingLog?.logDate || initialDate);
+  const [userInitials, setUserInitials] = useState(existingLog?.userInitials || currentUser?.initials || '');
 
   if (!isOpen || !animal) return null;
 
-  const date = initialDate || new Date().toISOString().split('T')[0];
-
-  const handleSubmit = async (payload: any) => {
-    await onSave(payload);
-  };
-
-  const renderForm = () => {
-    // Find the existing log safely without crashing Vite
-    const existingLog = dailyLogs.find(l => l.animalId === animal.id && l.logType === logType);
+  // Delegate to specific TanStack forms
+  const renderSpecificForm = () => {
+    const commonProps = {
+      animal,
+      date,
+      userInitials,
+      existingLog,
+      onSave,
+      onCancel: onClose
+    };
 
     switch (logType) {
       case LogType.WEIGHT:
-        return <WeightForm key={existingLog?.id || 'w_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} onSave={handleSubmit} onCancel={onClose} />;
+        return <WeightForm {...commonProps} />;
       case LogType.FEED:
-        return <FeedForm key={existingLog?.id || 'f_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} foodTypes={foodTypes} feedMethods={feedMethods} onSave={handleSubmit} onCancel={onClose} />;
+        return <FeedForm {...commonProps} foodTypes={foodTypes} />;
       case LogType.TEMPERATURE:
-        return <TemperatureForm key={existingLog?.id || 't_new'} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} onSave={handleSubmit} onCancel={onClose} />;
+        return <TemperatureForm {...commonProps} defaultTemperature={defaultTemperature} />;
       case LogType.BIRTH:
-        return <BirthForm animal={animal} date={date} userInitials={userInitials} onSave={handleSubmit} onCancel={onClose} />;
+        return <BirthForm {...commonProps} />;
+      case LogType.EVENT:
+      case LogType.HEALTH:
+      case LogType.MISTING:
+      case LogType.WATER:
+      case LogType.GENERAL:
+      case LogType.FLIGHT:
+      case LogType.TRAINING:
       default:
-        return <StandardForm key={existingLog?.id || 's_new'} logType={logType} animal={animal} date={date} userInitials={userInitials} existingLog={existingLog} eventTypes={eventTypes} onSave={handleSubmit} onCancel={onClose} />;
+        return <StandardForm {...commonProps} logType={logType} eventTypes={eventTypes} />;
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Log Data</h2>
-            <p className="text-xs font-medium text-slate-500 mt-0.5">{animal.name} ({animal.species})</p>
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+              {existingLog ? 'Edit' : 'Add'} {logType}
+            </h2>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+              {animal.name} ({animal.species})
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
             <X size={20} />
           </button>
         </div>
-
-        <div className="p-4 border-b border-slate-100 overflow-x-auto scrollbar-hide">
-          <div className="flex gap-2 min-w-max">
-            {Object.values(LogType).filter(type => type !== LogType.SYSTEM).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setLogType(type)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-                  logType === type ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
+        
+        {/* Form Body Container */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          
+          {/* Global Router Controls */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-0 transition-all font-bold text-xs" required />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Type</label>
+              <select value={logType} onChange={e => setLogType(e.target.value as LogType)} disabled={!!existingLog} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-0 transition-all font-bold text-xs">
+                {Object.values(LogType).map(type => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div className="p-4 overflow-y-auto">
-          {renderForm()}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Staff Initials <span className="text-red-500">*</span></label>
+            <input type="text" value={userInitials} onChange={e => setUserInitials(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-0 transition-all font-bold text-xs" placeholder="e.g. JD" required minLength={2} />
+          </div>
+
+          {/* Dynamic Form Injection */}
+          {renderSpecificForm()}
         </div>
       </div>
     </div>

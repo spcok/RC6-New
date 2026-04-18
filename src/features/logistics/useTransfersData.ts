@@ -1,8 +1,8 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { transfersCollection } from '@/src/lib/db';
+import { transfersCollection } from '../../lib/database';
 
 export const useTransfersData = () => {
-  const { data: transfers = [], isLoading } = useLiveQuery((q) => q.from({ item: transfersCollection }).select((row) => row.item));
+  const { data: transfers = [], isLoading } = useLiveQuery((q) => q.from({ item: transfersCollection }));
 
   return {
     transfers: transfers.filter((t: any) => !t.isDeleted),

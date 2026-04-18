@@ -1,10 +1,10 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { maintenanceCollection } from '@/src/lib/db';
+import { maintenanceCollection } from '../../lib/database';
 import { MaintenanceLog } from '../../types';
 
 export const useMaintenanceData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: maintenanceCollection }).select((row) => row.item)
+    q.from({ item: maintenanceCollection })
   );
 
   // 1. Safe Array Fallback: Protects against null/undefined cache states

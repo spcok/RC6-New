@@ -1,10 +1,10 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { firstAidCollection } from '@/src/lib/db';
+import { firstAidCollection } from '../../lib/database';
 import { FirstAidLog } from '../../types';
 
 export const useFirstAidData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: firstAidCollection }).select((row) => row.item)
+    q.from({ item: firstAidCollection })
   );
 
   const safeData = Array.isArray(data) ? data : [];

@@ -1,10 +1,10 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { rotaCollection } from '@/src/lib/db';
+import { rotaCollection } from '../../lib/database';
 import { RotaShift } from '../../types';
 
 export const useRotaData = () => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: rotaCollection }).select((row) => row.item)
+    q.from({ item: rotaCollection })
   );
 
   const safeData = Array.isArray(data) ? data : [];

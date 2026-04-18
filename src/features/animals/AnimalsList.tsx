@@ -8,7 +8,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useAnimalsData } from './useAnimalsData';
 import { useArchivedAnimalsData } from './useArchivedAnimalsData';
 import { DataTable } from '../../components/ui/DataTable';
-import { animalsCollection } from '@/src/lib/db';
+import { animalsCollection } from '../../lib/database';
 
 // ------------------------------------------------------------------
 // 1. INLINE TOOLBAR COMPONENT (Bypasses Import Errors)

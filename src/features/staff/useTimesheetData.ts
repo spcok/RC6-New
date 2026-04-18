@@ -1,10 +1,10 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { timesheetsCollection } from '@/src/lib/db';
+import { timesheetsCollection } from '../../lib/database';
 import { Timesheet } from '../../types';
 
 export const useTimesheetData = (staffName?: string) => {
   const { data, isLoading } = useLiveQuery((q) => 
-    q.from({ item: timesheetsCollection }).select((row) => row.item)
+    q.from({ item: timesheetsCollection })
   );
 
   const safeData = Array.isArray(data) ? data : [];

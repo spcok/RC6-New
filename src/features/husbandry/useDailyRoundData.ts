@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AnimalCategory, DailyRound, LogType } from '../../types';
 import { useLiveQuery } from '@tanstack/react-db';
-import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '@/src/lib/db';
+import { animalsCollection, dailyLogsCollection, dailyRoundsCollection } from '../../lib/database';
 
 interface AnimalCheckState {
     isAlive?: boolean;
@@ -13,13 +13,13 @@ interface AnimalCheckState {
 
 export function useDailyRoundData(viewDate: string) {
     // 1. REACTIVE UI with Official Selectors & Safe Arrays
-    const { data: rawAnimals, isLoading: isLoadingAnimals } = useLiveQuery((q) => q.from({ item: animalsCollection }).select((row) => row.item));
+    const { data: rawAnimals, isLoading: isLoadingAnimals } = useLiveQuery((q) => q.from({ item: animalsCollection }));
     const allAnimals = Array.isArray(rawAnimals) ? rawAnimals : [];
 
-    const { data: rawLogs, isLoading: isLoadingLogs } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }).select((row) => row.item));
+    const { data: rawLogs, isLoading: isLoadingLogs } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }));
     const liveLogs = Array.isArray(rawLogs) ? rawLogs : [];
 
-    const { data: rawRounds, isLoading: isLoadingRounds } = useLiveQuery((q) => q.from({ item: dailyRoundsCollection }).select((row) => row.item));
+    const { data: rawRounds, isLoading: isLoadingRounds } = useLiveQuery((q) => q.from({ item: dailyRoundsCollection }));
     const liveRounds = Array.isArray(rawRounds) ? rawRounds : [];
     
     const isLoading = isLoadingAnimals || isLoadingLogs || isLoadingRounds;

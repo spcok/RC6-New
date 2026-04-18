@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { LogType, LogEntry, Animal } from '../../../types';
-// import { animalsCollection } from '@/src/lib/db';
+import { animalsCollection } from '../../../lib/database';
 
 const birthSchema = z.object({
   litterSize: z.number().min(0, 'Litter size must be at least 0'),
@@ -41,7 +41,31 @@ export default function BirthForm({ animal, date, userInitials, existingLog, onS
       try {
         // CRITICAL BUSINESS LOGIC: Spawn new animal profiles for the pups
         if (!existingLog) {
-          // Sync removed for local-only compatibility
+          for (const pup of value.pups) {
+            await animalsCollection.sync({
+              id: pup.id,
+              name: pup.name,
+              species: animal.species,
+              category: animal.category,
+              dob: date,
+              isDobUnknown: false,
+              sex: 'Unknown',
+              location: animal.location,
+              acquisitionDate: date,
+              acquisitionType: 'BORN',
+              origin: 'Captive Bred',
+              damId: animal.sex === 'Female' ? animal.id : undefined,
+              sireId: animal.sex === 'Male' ? animal.id : undefined,
+              parentMobId: animal.entityType === 'GROUP' ? animal.id : animal.parentMobId,
+              hazardRating: animal.hazardRating,
+              isVenomous: animal.isVenomous,
+              weightUnit: animal.weightUnit,
+              archived: false,
+              isQuarantine: false,
+              displayOrder: 0,
+              isDeleted: false
+            } as Animal);
+          }
         }
 
         // Generate the log entry for the parent

@@ -1,8 +1,8 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { movementsCollection } from '@/src/lib/db';
+import { movementsCollection } from '../../lib/database';
 
 export const useMovementsData = () => {
-  const { data: movements = [], isLoading } = useLiveQuery((q) => q.from({ item: movementsCollection }).select((row) => row.item));
+  const { data: movements = [], isLoading } = useLiveQuery((q) => q.from({ item: movementsCollection }));
 
   return { 
     movements: movements.filter((m: any) => !m.isDeleted), 

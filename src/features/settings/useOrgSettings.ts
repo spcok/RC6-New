@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { orgSettingsCollection } from '@/src/lib/db';
+import { orgSettingsCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { OrgProfileSettings } from '../../types';
 import { mapToCamelCase } from '../../lib/dataMapping';
@@ -39,6 +39,10 @@ export function useOrgSettings() {
   });
 
   const saveSettingsMutation = useMutation({
+    onMutate: async (newSettings: OrgProfileSettings) => {
+      await orgSettingsCollection.sync(newSettings);
+      return { newSettings };
+    },
     mutationFn: async (newSettings: OrgProfileSettings) => {
       const supabasePayload = {
         id: newSettings.id || 'profile',

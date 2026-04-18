@@ -4,7 +4,6 @@ import { LayoutContext } from './LayoutContext';
 import { useAuthStore } from '../../store/authStore';
 import { useSupabaseRealtime } from '../../hooks/useSupabaseRealtime';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useOfflinePreloader } from '../../hooks/useOfflinePreloader';
 import { 
   LayoutDashboard, ClipboardList, CheckSquare, CalendarDays, 
   Stethoscope, ArrowRightLeft, Plane, Wrench, AlertTriangle, 
@@ -87,8 +86,6 @@ const NAVIGATION_GROUPS = [
 
 export default function Layout() {
   useSupabaseRealtime();
-  const { isReady } = useOfflinePreloader();
-  console.log('Vault Sync Ready:', isReady);
   const location = useLocation();
   const currentUser = useAuthStore(s => s.currentUser);
   const logout = useAuthStore(s => s.logout);

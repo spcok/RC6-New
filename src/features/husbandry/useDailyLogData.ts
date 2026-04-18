@@ -1,54 +1,60 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
 import { getUKLocalDate } from '../../services/temporalService';
-import { dailyLogsCollection, animalsCollection } from '@/src/lib/db';
-import { LogEntry, AnimalCategory } from '../../types';
+import { dailyLogsCollection, animalsCollection } from '../../lib/database';
+import { LogEntry, LogType, AnimalCategory } from '../../types';
 
-export const useDailyLogData = (viewDate: string, activeCategory: string) => {
-  const { data: logs = [], isLoading: logsLoading } = useLiveQuery((q) => q.from({ item: dailyLogsCollection }).select((row) => row.item));
-  const { data: animals = [], isLoading: animalsLoading } = useLiveQuery((q) => q.from({ item: animalsCollection }).select((row) => row.item));
+export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategory | 'all' | string, animalId?: string) => {
+  
+  // OFFICIAL SELECTOR: No manual queryFn needed here
+  const { data: logs = [], isLoading: logsLoading } = useLiveQuery((q) => 
+    q.from({ item: dailyLogsCollection })
+  );
+
+  const { data: animals = [], isLoading: animalsLoading } = useLiveQuery((q) => 
+    q.from({ item: animalsCollection })
+  );
   
   const dailyLogs = useMemo(() => {
-    let result = logs.filter((log: LogEntry) => !log.isDeleted);
-    
-    if (viewDate !== 'all') {
-       const targetDate = viewDate === 'today' ? getUKLocalDate() : viewDate;
-       result = result.filter((log: LogEntry) => log.logDate === targetDate);
-    }
-    
-    return result.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [logs, viewDate]);
+    const targetDate = _viewDate === 'today' ? getUKLocalDate() : _viewDate;
+    return logs.filter(log => 
+      !log.isDeleted && 
+      (_viewDate === 'all' || log.logDate === targetDate) && 
+      (!animalId || log.animalId === animalId)
+    );
+  }, [logs, _viewDate, animalId]);
+
+  const getTodayLog = (animalId: string, type: LogType) => {
+    const targetDate = _viewDate === 'today' ? getUKLocalDate() : _viewDate;
+    return logs.find(log => log.animalId === animalId && log.logType === type && log.logDate === targetDate);
+  };
 
   const filteredAnimals = useMemo(() => {
-    return animals.filter((a: any) => {
-      if (a.isDeleted || a.archived) return false;
-      if (activeCategory === 'all') return true;
-      return a.category === activeCategory;
-    });
+    return animals.filter(a => activeCategory === 'all' || a.category === activeCategory);
   }, [animals, activeCategory]);
 
-  return {
-    animals: filteredAnimals,
-    dailyLogs,
-    addLogEntry: async (entry: Partial<LogEntry>) => {
-        await dailyLogsCollection.insert({
-            id: entry.id || crypto.randomUUID(),
-            createdAt: new Date().toISOString(),
-            isDeleted: false,
-            ...entry
-        });
-    }, 
-    updateLogEntry: async (id: string, entry: Partial<LogEntry>) => {
-      await dailyLogsCollection.update(id, (old: LogEntry) => ({ 
+  return { 
+    animals: filteredAnimals, 
+    getTodayLog, 
+    addLogEntry: (entry: Partial<LogEntry>) => dailyLogsCollection.insert({
+        id: entry.id || crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        isDeleted: false,
+        ...entry
+    }), 
+    // FIX: Safely merge old and new data, strictly protecting the primary key (id)
+    updateLogEntry: (id: string, entry: Partial<LogEntry>) => {
+      return dailyLogsCollection.update(id, (old: LogEntry) => {
+        return { 
           ...old, 
           ...entry, 
-          id: old.id,
-          updatedAt: new Date().toISOString()
-      }));
+          id: old.id, // Strictly protect the primary key
+          updatedAt: new Date().toISOString() // Optional: good practice to track edits
+        };
+      });
     },
-    deleteLogEntry: async (id: string) => {
-        await dailyLogsCollection.update(id, (old: LogEntry) => ({ ...old, isDeleted: true }));
-    },
+    deleteLogEntry: (id: string) => dailyLogsCollection.delete(id),
+    dailyLogs, 
     isLoading: animalsLoading || logsLoading
   };
 };

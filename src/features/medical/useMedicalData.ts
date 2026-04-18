@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
-import { medicalLogsCollection, marChartsCollection, quarantineRecordsCollection } from '@/src/lib/db';
+import { medicalLogsCollection, marChartsCollection, quarantineRecordsCollection } from '../../lib/database';
 import { ClinicalNote, MARChart, QuarantineRecord } from '../../types';
 
 export const useMedicalData = (animalId?: string) => {
-  const { data: rawClinicalNotes = [], isLoading: notesLoading } = useLiveQuery((q) => q.from({ item: medicalLogsCollection }).select((row) => row.item));
-  const { data: rawMarCharts = [], isLoading: marLoading } = useLiveQuery((q) => q.from({ item: marChartsCollection }).select((row) => row.item));
-  const { data: rawQuarantineRecords = [], isLoading: quarantineLoading } = useLiveQuery((q) => q.from({ item: quarantineRecordsCollection }).select((row) => row.item));
+  const { data: rawClinicalNotes = [], isLoading: notesLoading } = useLiveQuery((q) => q.from({ item: medicalLogsCollection }));
+  const { data: rawMarCharts = [], isLoading: marLoading } = useLiveQuery((q) => q.from({ item: marChartsCollection }));
+  const { data: rawQuarantineRecords = [], isLoading: quarantineLoading } = useLiveQuery((q) => q.from({ item: quarantineRecordsCollection }));
 
   const clinicalNotes = useMemo(() => rawClinicalNotes.filter((n: ClinicalNote) => !n.isDeleted && (!animalId || n.animalId === animalId)), [rawClinicalNotes, animalId]);
   const marCharts = useMemo(() => rawMarCharts.filter((m: MARChart) => !m.isDeleted && (!animalId || m.animalId === animalId)), [rawMarCharts, animalId]);

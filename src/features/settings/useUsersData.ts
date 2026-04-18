@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { usersCollection } from '@/src/lib/db';
+import { usersCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { mapToCamelCase } from '../../lib/dataMapping';
 import { UserProfile } from '../../types';
@@ -32,6 +32,9 @@ export const useUsersData = () => {
   });
 
   const updateUserMutation = useMutation({
+    onMutate: async (user: UserProfile) => {
+      await usersCollection.sync(user);
+    },
     mutationFn: async (user: Partial<UserProfile> & { id: string }) => {
       const supabasePayload = {
         name: user.name,

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { zlaDocumentsCollection } from '@/src/lib/db';
+import { zlaDocumentsCollection } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 import { ZLADocument } from '../../types';
 
@@ -26,6 +26,7 @@ export const useZLADocsData = () => {
   const addDocumentMutation = useMutation({
     mutationFn: async (doc: Omit<ZLADocument, 'id'>) => {
       const payload = { ...doc, id: crypto.randomUUID() } as ZLADocument;
+      await zlaDocumentsCollection.sync(payload);
       
       const { error } = await supabase.from('zla_documents').insert([payload]);
       if (error) throw error;
