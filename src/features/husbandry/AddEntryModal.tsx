@@ -51,6 +51,19 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
 
   if (!isOpen || !animal) return null;
 
+  // Interceptor to guarantee id preservation
+  const handleInterceptedSave = async (partialEntry: Partial<LogEntry>) => {
+    const finalPayload = {
+      ...partialEntry,
+      logType: form.getFieldValue('logType'),
+      logDate: form.getFieldValue('logDate'),
+      userInitials: form.getFieldValue('userInitials'),
+      // Crucial: preserve existing ID
+      ...(existingLog?.id && { id: existingLog.id })
+    };
+    await onSave(finalPayload);
+  };
+
   // Delegate to specific TanStack forms
   const renderSpecificForm = () => {
     const commonProps = {
@@ -58,7 +71,7 @@ export default function AddEntryModal({ isOpen, onClose, onSave, animal, initial
       date: form.getFieldValue('logDate'),
       userInitials: form.getFieldValue('userInitials'),
       existingLog,
-      onSave, // Still taking onSave from props, maybe should be handled by form submission?
+      onSave: handleInterceptedSave, // Correctly intercepted
       onCancel: onClose
     };
 

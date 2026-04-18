@@ -4,6 +4,9 @@ export const toCamelCase = (str: string): string => {
   // but converts internal snake_case (animal_id -> animalId)
   if (str.startsWith('_')) return str; 
   
+  // Handles 'ID' -> 'id' and 'Id' -> 'id' if needed, or preserves it if it's already camelCase
+  if (str.toLowerCase() === 'id') return 'id';
+
   return str.replace(/([-_][a-z0-9])/gi, (match) => {
     return match.toUpperCase().replace('-', '').replace('_', '');
   });
