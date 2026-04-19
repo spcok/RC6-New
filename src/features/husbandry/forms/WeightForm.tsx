@@ -3,7 +3,6 @@ import { useForm } from '@tanstack/react-form';
 import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 import { Save, Loader2 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import { LogType, LogEntry, Animal } from '../../../types';
 import { convertToGrams, convertFromGrams } from '../../../services/weightUtils';
 
@@ -45,7 +44,6 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
     onSubmit: async ({ value }) => {
       try {
         const payload: Partial<LogEntry> = {
-          id: existingLog?.id || uuidv4(),
           animalId: animal.id,
           logType: LogType.WEIGHT,
           logDate: date,
@@ -60,18 +58,14 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
         onCancel();
       } catch (err: unknown) {
         console.error("Submission Error:", err);
-        if (err instanceof Error) {
-          alert(`Database Error: ${err.message}`);
-        } else {
-          alert('Failed to save log');
-        }
+        alert(`Failed to save log: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
   });
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }} className="space-y-6">
-      <form.Field name="weightValues" children={(field) => {
+      <form.Field name="weightValues" validators={{ onChange: weightSchema }} children={(field) => {
         const handleWeightChange = (subField: string, val: string) => {
           const num = val === '' ? 0 : parseInt(val, 10);
           const newValues = { ...field.state.value, [subField]: num };
@@ -125,11 +119,11 @@ export default function WeightForm({ animal, date, userInitials, existingLog, on
                 </>
               )}
             </div>
+            {field.state.meta.errors ? <em className="text-xs text-red-500">{field.state.meta.errors.join(', ')}</em> : null}
             <p className="text-[10px] font-medium text-slate-400 italic mt-2">Calculated Value: {convertToGrams(targetUnit as 'g' | 'oz' | 'lb', field.state.value).toFixed(2)}g</p>
           </div>
         );
-      }} />
-      
+      }} />      
       <form.Field name="notes" children={(field) => (
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Notes (Optional)</label>
