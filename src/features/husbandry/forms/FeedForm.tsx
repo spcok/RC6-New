@@ -3,6 +3,7 @@ import { useForm } from '@tanstack/react-form';
 import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 import { Save, Loader2, Plus, Trash2 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { LogType, LogEntry, Animal, OperationalList } from '../../../types';
 
 const feedSchema = z.object({
@@ -56,9 +57,7 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
           .join(', ');
         
         const payload: Partial<LogEntry> = {
-          // Explicitly pass id from onSave to ensure it exists.
-          // Note: The onSave handler (handleInterceptedSave) will merge its own id 
-          // and state if this is partial.
+          id: existingLog?.id || uuidv4(),
           animalId: animal.id,
           logType: LogType.FEED,
           logDate: date,
@@ -70,15 +69,18 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
         onCancel(); // Force modal to close on success
       } catch (err: unknown) {
         console.error("Submission Error:", err);
-        // Explicit and visible error handling
-        alert(`Failed to save log: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        if (err instanceof Error) {
+          alert(`Database Error: ${err.message}`);
+        } else {
+          alert('Failed to save log');
+        }
       }
     }
   });
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }} className="space-y-6">
-      <form.Field name="feedItems" validators={{ onChange: z.array(z.object({ type: z.string(), quantity: z.string() })).min(1, 'At least one feed item required') }} children={(field) => (
+      <form.Field name="feedItems" children={(field) => (
         <div className="space-y-4">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Feed Items</label>
           {field.state.value.map((item, index) => (
@@ -101,7 +103,6 @@ export default function FeedForm({ animal, date, userInitials, existingLog, food
               </button>
             </div>
           ))}
-          {field.state.meta.errors ? <em className="text-xs text-red-500">{field.state.meta.errors.join(', ')}</em> : null}
           <button type="button" onClick={() => field.handleChange([...field.state.value, { type: '', quantity: '' }])} className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
             <Plus size={14} /> Add Item
           </button>

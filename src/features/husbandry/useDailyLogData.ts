@@ -42,28 +42,16 @@ export const useDailyLogData = (_viewDate: string, activeCategory: AnimalCategor
         isDeleted: false,
         ...entry
     }), 
-    updateLogEntry: async (id: string, entry: Partial<LogEntry>) => {
-      // Attempt upsert first, it handles both existing and new records, resolving 'not found' issues.
-      // We cast to any because the TanStack DB collection types can be elusive.
-      const collection = dailyLogsCollection as any;
-      if (typeof collection.upsert === 'function') {
-        return collection.upsert({ ...entry, id, updatedAt: new Date().toISOString() });
-      }
-      
-      // Fallback to update for older versions of the SDK, but use the object signature which
-      // is reported to be triggering a callback error if the implementation expects a function.
-      // If object update fails, fallback to callback as a last resort.
-      try {
-        return await collection.update(id, { ...entry, id, updatedAt: new Date().toISOString() });
-      } catch (err) {
-        // Fallback to callback if object update (explicit) failed as not-a-function
-        return await collection.update(id, (old: LogEntry | undefined) => ({
-          ...old,
-          ...entry,
-          id,
-          updatedAt: new Date().toISOString()
-        }));
-      }
+    // FIX: Safely merge old and new data, strictly protecting the primary key (id)
+    updateLogEntry: (id: string, entry: Partial<LogEntry>) => {
+      return dailyLogsCollection.update(id, (old: LogEntry) => {
+        return { 
+          ...old, 
+          ...entry, 
+          id: old.id, // Strictly protect the primary key
+          updatedAt: new Date().toISOString() // Optional: good practice to track edits
+        };
+      });
     },
     deleteLogEntry: (id: string) => dailyLogsCollection.delete(id),
     dailyLogs, 
